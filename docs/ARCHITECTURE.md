@@ -98,11 +98,11 @@ everything else is the plan.
 | `forgeline-core` | Ids, domain model, events, `RunState` fold, dependency graph, budgets. No I/O. | **built** |
 | `forgeline-store` | Append-only event log on SQLite, validation in the write transaction, idempotency keys, run summaries, live subscriptions. | **built** |
 | `forgeline-workspace` | Workspace backends. Git layer (worktrees, commits, diffs, merges) today; `WorkspaceBackend` trait, OS sandbox, Docker, E2B later. | git layer **built** |
-| `forgeline-agents` | `AgentRuntime` trait, adapters (Claude Code, Codex, ACP, mock), normalization into `AgentEvent`, capabilities. | M1 |
-| `forgeline-engine` | Per-run actors: `decide(state) → commands`, dispatch, concurrency limits, retries, verification, review, integration, approvals. | M1 |
-| `forgeline-config` | `forgeline.toml`, pipelines, role prompts, override stack. | M1 |
-| `forgeline-server` | axum REST + SSE/WebSocket event stream; serves the UI; exports TypeScript types. | M2 |
-| `forgeline-cli` | The `forgeline` binary: `init`, `run`, `runs`, `show`, `watch`, `approve`, `serve`, `doctor`. | M1 |
+| `forgeline-agents` | `AgentRuntime` trait, adapters (Claude Code, Codex, ACP, mock), normalization into `AgentEvent`, capabilities. | Claude Code + mock **built** |
+| `forgeline-engine` | Per-run driver: pure scheduling decisions, dispatch, concurrency limits, retries, verification, integration, approvals, recovery. | **built** (review: M2) |
+| `forgeline-config` | `forgeline.toml`, plans, permission policy; pipelines and role prompts later. | **built** |
+| `forgeline-server` | axum REST + resumable SSE stream; serves the UI; generated TypeScript types. | **built** |
+| `forgeline-cli` | The `forgeline` binary: `init`, `run`, `resume`, `runs`, `show`, `events`, `approvals`, `approve`, `serve`, `doctor`. | **built** |
 | `ui/` | The web app (open for design). Consumes only the public API. | M3 |
 
 ---
@@ -181,10 +181,11 @@ already run Temporal) possible later without touching the engine.
 
 ---
 
-## 7. The engine (M1)
+## 7. The engine (built)
 
-Each active run is owned by one tokio task (an actor) with a bounded mailbox.
-The loop is:
+Each active run is owned by one driver task (`Engine::drive`). Attempts run as
+separate tasks in a `JoinSet`; the driver integrates their results one at a
+time, which makes it the run's merge queue. Conceptually the loop is:
 
 ```
 loop {
@@ -289,7 +290,7 @@ every exit is a typed state; every event is persisted.
 
 ---
 
-## 9. Agents (M1: mock + Claude Code; M2: ACP, Codex)
+## 9. Agents (built: mock + Claude Code; next: Codex, ACP)
 
 Three layers, following vibe-kanban's executor design:
 
@@ -409,7 +410,7 @@ pub trait Workspace: Send + Sync {
 
 ---
 
-## 11. Verification, proof and review (M1: checks + proof; M2: anti-gaming, lenses)
+## 11. Verification, proof and review (built: checks from the base branch, fix rounds, post-merge checks; next: proof records, review)
 
 - **Checks** (`build`, `lint`, `test`, …) are read from `forgeline.toml` *on the
   base ref*, so an agent cannot weaken its own gate by editing the config.
@@ -430,7 +431,7 @@ pub trait Workspace: Send + Sync {
 
 ---
 
-## 12. Integration and publishing (M1: local integration branch; M2: publisher + PRs)
+## 12. Integration and publishing (built: serial merge queue into the integration branch; next: publisher + PRs)
 
 - A **merge queue** per run integrates verified task branches one at a time
   into `forgeline/<run>/integration`: rebase/merge → re-run checks → advance.
@@ -444,7 +445,7 @@ pub trait Workspace: Send + Sync {
 
 ---
 
-## 13. Humans in the loop (M1: approvals via CLI; M2: API; M3: UI)
+## 13. Humans in the loop (built: permission approvals via CLI and API; next: plan approval, UI)
 
 Approvals are durable objects: plan approval, merge approval, agent questions
 and permission escalations. Each has an id, a title, details, an optional
@@ -457,7 +458,7 @@ UI renders as an inbox sorted by urgency: `waiting_on_you` → `error` →
 
 ---
 
-## 14. API and UI contract (M2)
+## 14. API and UI contract (built; see [API.md](API.md))
 
 The UI is a pure client of a documented API; the engine never renders UI.
 

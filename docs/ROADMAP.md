@@ -14,7 +14,13 @@ written as tests or demos, not feelings.
 - `forgeline-workspace`: git layer (worktrees, commits, diffs, merges with
   conflict reporting).
 
-## M1 — First vertical slice: plan → parallel agents → verified integration
+## M1 — First vertical slice: plan → parallel agents → verified integration ✅
+
+Built as described below, plus a server (from M2): `forgeline serve` exposes
+REST snapshots, a resumable SSE stream, approvals and token auth, with
+TypeScript types generated from the Rust types. 65 tests; the exit test lives
+in `crates/forgeline-engine/tests/engine.rs`. Not yet verified: a real Claude
+Code run end to end (the adapter is tested against a protocol-faithful fake).
 
 - `forgeline-agents`: `AgentRuntime`/`AgentSession` traits; `mock` adapter
   (scripted file edits, for tests and demos); `claude-code` adapter
@@ -36,8 +42,8 @@ claude-code` on a real repository.
 
 ## M2 — API, planning, review, durability
 
-- `forgeline-server`: REST snapshots + SSE stream with resume by `seq`,
-  approvals endpoint, generated TypeScript types with a CI drift check.
+- ~~`forgeline-server`: REST snapshots + SSE stream with resume by `seq`,
+  approvals endpoint, generated TypeScript types with a CI drift check.~~ (done)
 - Planner stage: an agent writes `plan.json` (validated as a DAG); optional
   human plan approval.
 - Reviewer stage: fresh-context review (optionally another runtime/model),
