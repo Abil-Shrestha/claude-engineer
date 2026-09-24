@@ -12,6 +12,11 @@ description = "An open-source software factory: orchestrate swarms of coding age
 
 [workspace.dependencies]
 forgeline-core = { path = "crates/forgeline-core" }
+forgeline-config = { path = "crates/forgeline-config" }
+forgeline-store = { path = "crates/forgeline-store" }
+forgeline-workspace = { path = "crates/forgeline-workspace" }
+forgeline-agents = { path = "crates/forgeline-agents" }
+forgeline-engine = { path = "crates/forgeline-engine" }
 
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

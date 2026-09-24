@@ -36,6 +36,8 @@ pub enum ApplyError {
     UnknownAttempt(AttemptId),
     #[error("unknown approval {0}")]
     UnknownApproval(ApprovalId),
+    #[error("approval {0} is already resolved")]
+    ApprovalAlreadyResolved(ApprovalId),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,6 +49,9 @@ pub struct TaskState {
     pub attempts: Vec<AttemptId>,
     /// Commit on the integration branch once the task's work has landed.
     pub integrated_commit: Option<String>,
+    /// Why the latest verified attempt could not be integrated, if it could
+    /// not. Fed back to the next attempt; cleared on integration.
+    pub last_integration_error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -207,6 +212,7 @@ impl RunState {
                         status_reason: None,
                         attempts: Vec::new(),
                         integrated_commit: None,
+                        last_integration_error: None,
                     },
                 );
             }
@@ -321,6 +327,9 @@ impl RunState {
                     .approvals
                     .get_mut(approval_id)
                     .ok_or(ApplyError::UnknownApproval(*approval_id))?;
+                if approval.resolution.is_some() {
+                    return Err(ApplyError::ApprovalAlreadyResolved(*approval_id));
+                }
                 approval.resolution = Some(Resolution {
                     decision: *decision,
                     by: by.clone(),
@@ -331,7 +340,14 @@ impl RunState {
             EventKind::BranchIntegrated {
                 task_id, commit, ..
             } => {
-                self.task_mut(*task_id)?.integrated_commit = Some(commit.clone());
+                let task = self.task_mut(*task_id)?;
+                task.integrated_commit = Some(commit.clone());
+                task.last_integration_error = None;
+            }
+            EventKind::IntegrationFailed {
+                task_id, reason, ..
+            } => {
+                self.task_mut(*task_id)?.last_integration_error = Some(reason.clone());
             }
             EventKind::PullRequestOpened { url, number } => {
                 self.pull_request = Some(PullRequest {
@@ -570,6 +586,22 @@ mod tests {
         });
         let state = log.state();
         assert_eq!(state.pending_approvals().count(), 0);
+        let mut again = state.clone();
+        let second = Event {
+            seq: state.last_seq + 1,
+            run_id: log.run_id,
+            at_ms: 0,
+            kind: EventKind::ApprovalResolved {
+                approval_id,
+                decision: Decision::Rejected,
+                by: "someone-else".into(),
+                comment: None,
+            },
+        };
+        assert_eq!(
+            again.apply(&second),
+            Err(ApplyError::ApprovalAlreadyResolved(approval_id))
+        );
         assert_eq!(
             state.approvals[&approval_id]
                 .resolution

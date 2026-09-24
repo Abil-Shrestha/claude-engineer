@@ -98,6 +98,14 @@ pub enum EventKind {
         branch: String,
         commit: String,
     },
+    /// A verified attempt could not be integrated (merge conflict, or checks
+    /// failing on the combined code); the task will be retried on top of the
+    /// new integration head.
+    IntegrationFailed {
+        task_id: TaskId,
+        attempt_id: AttemptId,
+        reason: String,
+    },
     PullRequestOpened {
         url: String,
         number: Option<u64>,
@@ -124,6 +132,7 @@ impl EventKind {
             Self::ApprovalRequested { .. } => "approval_requested",
             Self::ApprovalResolved { .. } => "approval_resolved",
             Self::BranchIntegrated { .. } => "branch_integrated",
+            Self::IntegrationFailed { .. } => "integration_failed",
             Self::PullRequestOpened { .. } => "pull_request_opened",
             Self::BudgetExceeded { .. } => "budget_exceeded",
         }

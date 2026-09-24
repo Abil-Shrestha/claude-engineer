@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use forgeline_core::{ApplyError, Event, EventKind, RunId, RunState, RunStatus, Usage};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -114,6 +114,9 @@ impl EventStore {
     }
 
     fn from_connection(mut conn: Connection) -> Result<Self> {
+        // Other processes (the CLI, a second engine) may hold the write lock
+        // briefly; wait for it instead of failing.
+        conn.busy_timeout(std::time::Duration::from_secs(15))?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         migrate(&mut conn)?;
         let (events, _) = broadcast::channel(BROADCAST_CAPACITY);
@@ -233,18 +236,12 @@ impl EventStore {
 }
 
 impl Inner {
-    /// Returns the cached state of a run, loading it from the log if needed.
+    /// Returns the state of a run, bringing the cached copy up to date with
+    /// events other processes may have appended.
     fn state(&mut self, run_id: RunId) -> Result<Option<&RunState>> {
-        if !self.runs.contains_key(&run_id) {
-            let events = query_events(
-                &self.conn,
-                "WHERE run_id = ?1 ORDER BY seq",
-                params![run_id.to_string()],
-            )?;
-            if events.is_empty() {
-                return Ok(None);
-            }
-            self.runs.insert(run_id, RunState::replay(&events)?);
+        let cached = self.runs.remove(&run_id);
+        if let Some(state) = catch_up(&self.conn, run_id, cached)? {
+            self.runs.insert(run_id, state);
         }
         Ok(self.runs.get(&run_id))
     }
@@ -255,9 +252,14 @@ impl Inner {
         kinds: Vec<EventKind>,
         idempotency_key: Option<&str>,
     ) -> Result<(Vec<Event>, bool)> {
+        // Take the write lock up front so the idempotency check, the
+        // catch-up read and the insert see one consistent log, even when
+        // several processes share the database.
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
         if let Some(key) = idempotency_key {
-            let prior: Option<(i64, i64)> = self
-                .conn
+            let prior: Option<(i64, i64)> = tx
                 .query_row(
                     "SELECT first_seq, last_seq FROM idempotency WHERE key = ?1",
                     [key],
@@ -266,7 +268,7 @@ impl Inner {
                 .optional()?;
             if let Some((first, last)) = prior {
                 let events = query_events(
-                    &self.conn,
+                    &tx,
                     "WHERE seq BETWEEN ?1 AND ?2 ORDER BY seq",
                     params![first, last],
                 )?;
@@ -279,9 +281,8 @@ impl Inner {
 
         // Validate against a scratch copy of the state; only publish it to
         // the cache once the transaction commits.
-        let mut state = self.state(run_id)?.cloned();
+        let mut state = catch_up(&tx, run_id, self.runs.get(&run_id).cloned())?;
         let at_ms = now_ms();
-        let tx = self.conn.transaction()?;
         let mut stored = Vec::with_capacity(kinds.len());
         for kind in kinds {
             let payload = serde_json::to_string(&kind).expect("events always serialize");
@@ -323,6 +324,41 @@ impl Inner {
         tx.commit()?;
         self.runs.insert(run_id, state);
         Ok((stored, true))
+    }
+}
+
+/// Applies any events newer than `cached` (appended by another process), or
+/// replays the run from scratch when nothing is cached. `None` means the run
+/// does not exist.
+fn catch_up(
+    conn: &Connection,
+    run_id: RunId,
+    cached: Option<RunState>,
+) -> Result<Option<RunState>> {
+    match cached {
+        Some(mut state) => {
+            let newer = query_events(
+                conn,
+                "WHERE run_id = ?1 AND seq > ?2 ORDER BY seq",
+                params![run_id.to_string(), state.last_seq as i64],
+            )?;
+            for event in &newer {
+                state.apply(event)?;
+            }
+            Ok(Some(state))
+        }
+        None => {
+            let events = query_events(
+                conn,
+                "WHERE run_id = ?1 ORDER BY seq",
+                params![run_id.to_string()],
+            )?;
+            if events.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(RunState::replay(&events)?))
+            }
+        }
     }
 }
 
@@ -571,6 +607,55 @@ mod tests {
         assert_eq!(after_first.len(), 1);
         assert_eq!(after_first[0].run_id, b);
         assert_eq!(store.run_events(a, 0, 100).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn two_handles_on_one_file_stay_consistent() {
+        // Two stores on the same file behave like two processes (for
+        // example the engine and `forgeline approve`).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("shared.sqlite");
+        let engine = EventStore::open(&path).unwrap();
+        let cli = EventStore::open(&path).unwrap();
+        let run = RunId::new();
+        let t1 = TaskId::new();
+        engine
+            .append(run, vec![created("shared"), task(t1, "T1")], None)
+            .await
+            .unwrap();
+        // The engine has the run cached; the CLI appends behind its back.
+        assert!(engine.run(run).await.unwrap().is_some());
+        cli.append(
+            run,
+            vec![EventKind::TaskStatusChanged {
+                task_id: t1,
+                status: TaskStatus::Ready,
+                reason: None,
+            }],
+            None,
+        )
+        .await
+        .unwrap();
+        // Reads catch up...
+        let state = engine.run(run).await.unwrap().unwrap();
+        assert_eq!(state.tasks[&t1].status, TaskStatus::Ready);
+        assert_eq!(state.last_seq, 3);
+        // ...and so do writes, which validate against the caught-up state.
+        let next = engine
+            .append(
+                run,
+                vec![EventKind::TaskStatusChanged {
+                    task_id: t1,
+                    status: TaskStatus::Running,
+                    reason: None,
+                }],
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(next[0].seq, 4);
+        let summary = &cli.list_runs().await.unwrap()[0];
+        assert_eq!(summary.last_seq, 4);
     }
 
     #[tokio::test]

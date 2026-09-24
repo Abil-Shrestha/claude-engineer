@@ -1,0 +1,18 @@
+[package]
+name = "forgeline-config"
+description = "Configuration for Forgeline: forgeline.toml, agent roles, checks, limits and plans."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+forgeline-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml = "1.1.6"
+
+[lints]
+workspace = true

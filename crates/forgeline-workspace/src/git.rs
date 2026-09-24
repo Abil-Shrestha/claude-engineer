@@ -159,6 +159,25 @@ impl GitRepo {
         })
     }
 
+    /// Checks out an existing `branch` into a new worktree at `path`.
+    pub async fn attach_worktree(&self, path: &Path, branch: &str) -> Result<Worktree> {
+        let path_arg = path.as_os_str().to_owned();
+        git(
+            &self.root,
+            [
+                OsStr::new("worktree"),
+                OsStr::new("add"),
+                &path_arg,
+                OsStr::new(branch),
+            ],
+        )
+        .await?;
+        Ok(Worktree {
+            path: path.to_owned(),
+            branch: branch.to_owned(),
+        })
+    }
+
     /// Removes a worktree directory (the branch is kept).
     pub async fn remove_worktree(&self, path: &Path, force: bool) -> Result<()> {
         let mut args = vec![OsStr::new("worktree"), OsStr::new("remove")];
@@ -172,6 +191,16 @@ impl GitRepo {
     pub async fn list_worktrees(&self) -> Result<Vec<WorktreeInfo>> {
         let out = git(&self.root, ["worktree", "list", "--porcelain"]).await?;
         Ok(parse_worktree_list(&out))
+    }
+
+    /// Contents of `path` at revision `rev`, or `None` if it does not exist
+    /// there. Used to read configuration from the trusted base branch.
+    pub async fn show_file(&self, rev: &str, path: &str) -> Result<Option<String>> {
+        match git(&self.root, ["show", &format!("{rev}:{path}")]).await {
+            Ok(content) => Ok(Some(content)),
+            Err(GitError::Failed { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     pub async fn delete_branch(&self, branch: &str, force: bool) -> Result<()> {
@@ -254,6 +283,13 @@ impl Worktree {
     /// Unified diff of this branch since it forked from `base`.
     pub async fn diff(&self, base: &str) -> Result<String> {
         git(&self.path, ["diff", &format!("{base}...HEAD")]).await
+    }
+
+    /// Moves this worktree's branch (and files) to `rev`, discarding changes.
+    pub async fn reset_hard(&self, rev: &str) -> Result<()> {
+        git(&self.path, ["reset", "--hard", "--quiet", rev])
+            .await
+            .map(|_| ())
     }
 
     /// Merges `branch` into this worktree's branch with a merge commit. On
@@ -421,8 +457,24 @@ mod tests {
         );
         assert!(wt.diff("main").await.unwrap().contains("+world"));
 
+        assert_eq!(
+            repo.show_file("fl/task-1", "new.txt")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("a\nb")
+        );
+        assert_eq!(repo.show_file("main", "new.txt").await.unwrap(), None);
+        let main_sha = repo.rev_parse("main").await.unwrap();
+        wt.reset_hard(&main_sha).await.unwrap();
+        assert_eq!(wt.head().await.unwrap(), main_sha);
+        assert!(!wt_path.join("new.txt").exists());
+
         repo.remove_worktree(&wt_path, false).await.unwrap();
         assert!(!wt_path.exists());
+        let again = repo.attach_worktree(&wt_path, "fl/task-1").await.unwrap();
+        assert_eq!(again.head().await.unwrap(), main_sha);
+        repo.remove_worktree(&wt_path, true).await.unwrap();
         repo.delete_branch("fl/task-1", true).await.unwrap();
         assert!(!repo.branch_exists("fl/task-1").await.unwrap());
     }
