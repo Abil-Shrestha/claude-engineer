@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/Abil-Shrestha/claude-engineer"
+repository = "https://github.com/Abil-Shrestha/bodega"
 description = "An open-source software factory: orchestrate swarms of coding agents from work item to reviewed pull request."
 
 [workspace.dependencies]

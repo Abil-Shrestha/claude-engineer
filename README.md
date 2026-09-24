@@ -41,13 +41,13 @@ back to the agent as feedback before a task is retried.)
 > **Status: early.** The engine, CLI and API work end to end and are covered
 > by tests, including the Claude Code adapter against a protocol-faithful fake.
 > Planning and review agents, pull requests, sandboxing and the web UI are
-> next. See the [roadmap](ROADMAP.md).
+> next. See the [roadmap](docs/ROADMAP.md).
 
 ## Why another agent orchestrator?
 
 We read the code of 30+ projects in this space (Symphony, Open SWE,
 OpenHands, Gas Town, vibe-kanban, AX, Agent Substrate and many more) before
-writing a line. The [synthesis](research/SYNTHESIS.md) is worth reading on its
+writing a line. The [synthesis](docs/research/SYNTHESIS.md) is worth reading on its
 own. Bodega is built on what that research says works:
 
 - **Deterministic core, LLMs at the edges.** Scheduling, retries, merging and
@@ -75,17 +75,17 @@ bodega run "Fix the flaky retry test"         # for real, with Claude Code
 bodega serve                                  # API + live stream on :7777
 ```
 
-Full guide: [GETTING_STARTED.md](GETTING_STARTED.md).
+Full guide: [GETTING_STARTED.md](docs/GETTING_STARTED.md).
 
 ## Documentation
 
 | | |
 |---|---|
-| [Getting started](GETTING_STARTED.md) | Install, configure, run, approve, resume |
-| [API](API.md) | REST + live event stream; how to build a UI on it |
-| [Architecture](ARCHITECTURE.md) | How it works and why |
-| [Roadmap](ROADMAP.md) | What's built, what's next, how to help |
-| [Research](research/SYNTHESIS.md) | What we learned from 30+ projects |
+| [Getting started](docs/GETTING_STARTED.md) | Install, configure, run, approve, resume |
+| [API](docs/API.md) | REST + live event stream; how to build a UI on it |
+| [Architecture](docs/ARCHITECTURE.md) | How it works and why |
+| [Roadmap](docs/ROADMAP.md) | What's built, what's next, how to help |
+| [Research](docs/research/SYNTHESIS.md) | What we learned from 30+ projects |
 
 ## Code map
 
@@ -106,9 +106,9 @@ Full guide: [GETTING_STARTED.md](GETTING_STARTED.md).
 --workspace` must pass (CI runs exactly that). Every behavior change comes with
 a test; scheduling changes come with a test of the pure functions in
 `bodega-engine/src/schedule.rs`. Pick an item from the
-[roadmap](ROADMAP.md) and open an issue that names it.
+[roadmap](docs/ROADMAP.md) and open an issue that names it.
 
 ## License
 
-Dual-licensed under [MIT](../LICENSE-MIT) or [Apache-2.0](../LICENSE-APACHE),
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE),
 at your option.

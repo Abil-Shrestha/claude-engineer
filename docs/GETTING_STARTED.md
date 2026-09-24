@@ -5,7 +5,7 @@
 Bodega is a single Rust binary. With a Rust toolchain (1.88+):
 
 ```sh
-git clone https://github.com/Abil-Shrestha/claude-engineer bodega
+git clone https://github.com/Abil-Shrestha/bodega
 cd bodega
 cargo install --path crates/bodega-cli     # installs `bodega`
 ```
