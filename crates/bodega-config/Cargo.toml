@@ -1,0 +1,19 @@
+[package]
+name = "bodega-config"
+description = "Configuration for Bodega: bodega.toml, agent roles, checks, limits and plans."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bodega-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ts-rs.workspace = true
+toml = "1.1.6"
+
+[lints]
+workspace = true

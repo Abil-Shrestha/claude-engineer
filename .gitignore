@@ -2,9 +2,9 @@
 /target/
 **/*.rs.bk
 
-# Local state created by forgeline at runtime
-/.forgeline/state/
-/.forgeline/worktrees/
+# Local state created by bodega at runtime
+/.bodega/state/
+/.bodega/worktrees/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

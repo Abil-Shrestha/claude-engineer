@@ -1,15 +1,15 @@
-# Forgeline API
+# Bodega API
 
-Everything Forgeline does is visible, and controllable, through a small HTTP
+Everything Bodega does is visible, and controllable, through a small HTTP
 API. The web UI, bots and scripts are all ordinary clients of it; the engine
 never renders anything itself.
 
 Start it with:
 
 ```sh
-forgeline serve                                      # http://127.0.0.1:7777
-forgeline serve --allow-origin http://localhost:5173 # plus a UI dev server
-forgeline serve --addr 0.0.0.0:7777 --token "$SECRET"  # remote access needs a token
+bodega serve                                      # http://127.0.0.1:7777
+bodega serve --allow-origin http://localhost:5173 # plus a UI dev server
+bodega serve --addr 0.0.0.0:7777 --token "$SECRET"  # remote access needs a token
 ```
 
 TypeScript types for every request, response and event are generated from the
@@ -136,7 +136,7 @@ stream.onmessage = async (message) => {
 
 Refetching the snapshot on structural events is the simplest correct client.
 A client that wants zero refetches can fold events itself; the rules are in
-`crates/forgeline-core/src/state.rs` (`RunState::apply`), and every event
+`crates/bodega-core/src/state.rs` (`RunState::apply`), and every event
 carries enough data to do it.
 
 ---
@@ -185,7 +185,7 @@ Every event has `seq`, `run_id`, `at_ms` (Unix milliseconds) and a `type`:
 
 ## Building a great UI on this
 
-The research behind Forgeline ([`research/05-workbenches-and-ui.md`](research/05-workbenches-and-ui.md))
+The research behind Bodega ([`research/05-workbenches-and-ui.md`](research/05-workbenches-and-ui.md))
 found what makes supervising many agents tractable, and what nobody has built
 yet. Suggested views, all derivable from the API above:
 

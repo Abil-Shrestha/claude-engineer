@@ -219,7 +219,7 @@ Budget and approval policies were **removed**: field 9 `policies` is reserved in
 
 ### Implications for a Rust framework
 - Model a `WorkspaceTemplate`: repos, toolchain setup, MCP, skills and an optional natural-language setup goal. Bind it per attempt, and compose several templates per workspace (for example code plus shared tools).
-- Ship a small in-sandbox daemon, `forgeline-agentd`, implementing AX's runner contract plus E2B-style exec/fs RPC. Every non-local backend then gets identical semantics.
+- Ship a small in-sandbox daemon, `bodega-agentd`, implementing AX's runner contract plus E2B-style exec/fs RPC. Every non-local backend then gets identical semantics.
 - Reconciliation must be level-triggered: periodic resync, retry with backoff (never ack-and-drop), CAS versions on status, and policy application that **fails closed**. The agent must not start until `PolicyEnforced=True`.
 - Store the setup marker *inside* whatever the snapshot scope preserves, or in the orchestrator's DB.
 
@@ -546,8 +546,8 @@ Sandbox logs (v1/v2), metrics, lifecycle events and **webhooks** with delivery s
 ### Rust sketch
 
 ```rust
-// crate: forgeline-workspace  (async-trait for dyn-compat; futures BoxStream; bytes::Bytes)
-use forgeline_core::ids::{AttemptId, WorkspaceId};
+// crate: bodega-workspace  (async-trait for dyn-compat; futures BoxStream; bytes::Bytes)
+use bodega_core::ids::{AttemptId, WorkspaceId};
 
 #[async_trait]
 pub trait WorkspaceBackend: Send + Sync + 'static {
@@ -685,7 +685,7 @@ Desired state is one of `{Running, Suspended, Terminated}` (AX `spec.suspend`). 
 | teardown | `worktree remove` + branch GC | `rm -f` | `kill` | `DeleteActor(any_state)` | `ax delete` |
 
 ### Which backend first
-**Build `LocalWorktree` first, with an `OsSandbox` exec layer. Build `Docker` second, `E2B` third, and `Substrate` behind a `forgeline-agentd` in-guest daemon later. Skip AX as a backend.**
+**Build `LocalWorktree` first, with an `OsSandbox` exec layer. Build `Docker` second, `E2B` third, and `Substrate` behind a `bodega-agentd` in-guest daemon later. Skip AX as a backend.**
 
 Why worktree first:
 - It needs no infrastructure and matches how Claude Code and Codex are run today.
@@ -696,4 +696,4 @@ Its `Capabilities` report `fork: FsOnly`, `snapshot_scopes: [FsOnly]` and `egres
 
 Docker adds real fs and network isolation cheaply. E2B maps almost 1:1 onto the trait and adds memory fork. Substrate brings density and credential injection, but it has no exec API in its core, so it needs our own in-guest daemon: AX's runner contract plus envd-style Process/FS RPC. That daemon also gives uniform semantics on any plain VM. AX is at the same layer as our orchestrator, so its value is in the ideas (Workspace/Gateway split, runner contract, desired-state suspend), not as a backend.
 
-Ship `forgeline-workspace-conformance` from day one: one test suite parameterized by backend, covering lifecycle transitions, exec streaming and timeouts, process-group kill, fs round-trip, fork isolation, policy fail-closed and `sync_out` completeness.
+Ship `bodega-workspace-conformance` from day one: one test suite parameterized by backend, covering lifecycle transitions, exec streaming and timeouts, process-group kill, fs round-trip, fork isolation, policy fail-closed and `sync_out` completeness.

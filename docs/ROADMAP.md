@@ -1,4 +1,4 @@
-# Forgeline roadmap
+# Bodega roadmap
 
 Each milestone ends with something you can run end to end. Exit criteria are
 written as tests or demos, not feelings.
@@ -7,32 +7,32 @@ written as tests or demos, not feelings.
 
 - Research of 30+ projects ([`research/`](research/SYNTHESIS.md)) and the
   architecture ([`ARCHITECTURE.md`](ARCHITECTURE.md)).
-- `forgeline-core`: ids, domain model, events, `RunState` fold, dependency
+- `bodega-core`: ids, domain model, events, `RunState` fold, dependency
   graph with cycle detection, budgets.
-- `forgeline-store`: SQLite event log with gapless `seq`, validation inside the
+- `bodega-store`: SQLite event log with gapless `seq`, validation inside the
   write transaction, idempotency keys, run summaries, live subscriptions.
-- `forgeline-workspace`: git layer (worktrees, commits, diffs, merges with
+- `bodega-workspace`: git layer (worktrees, commits, diffs, merges with
   conflict reporting).
 
 ## M1 — First vertical slice: plan → parallel agents → verified integration ✅
 
-Built as described below, plus a server (from M2): `forgeline serve` exposes
+Built as described below, plus a server (from M2): `bodega serve` exposes
 REST snapshots, a resumable SSE stream, approvals and token auth, with
 TypeScript types generated from the Rust types. 65 tests; the exit test lives
-in `crates/forgeline-engine/tests/engine.rs`. Not yet verified: a real Claude
+in `crates/bodega-engine/tests/engine.rs`. Not yet verified: a real Claude
 Code run end to end (the adapter is tested against a protocol-faithful fake).
 
-- `forgeline-agents`: `AgentRuntime`/`AgentSession` traits; `mock` adapter
+- `bodega-agents`: `AgentRuntime`/`AgentSession` traits; `mock` adapter
   (scripted file edits, for tests and demos); `claude-code` adapter
   (stream-json).
-- `forgeline-config`: `forgeline.toml` (agents per role, checks, limits).
-- `forgeline-engine`: per-run actor; plan from a file (or a single task from
+- `bodega-config`: `bodega.toml` (agents per role, checks, limits).
+- `bodega-engine`: per-run actor; plan from a file (or a single task from
   the request); tasks dispatched in dependency order under concurrency limits;
   one worktree and branch per attempt; checks run after each attempt;
   failures retried with the check output as feedback; verified branches merged
   one at a time into the run's integration branch; conflicts retried on the new
   head; budgets enforced.
-- `forgeline-cli`: `init`, `run`, `runs`, `show`, `events --follow`, `doctor`.
+- `bodega-cli`: `init`, `run`, `runs`, `show`, `events --follow`, `doctor`.
 
 **Exit**: an integration test runs a 4-task plan with a diamond dependency
 using the mock agent against a real git repo, including one task whose first
@@ -42,7 +42,7 @@ claude-code` on a real repository.
 
 ## M2 — API, planning, review, durability
 
-- ~~`forgeline-server`: REST snapshots + SSE stream with resume by `seq`,
+- ~~`bodega-server`: REST snapshots + SSE stream with resume by `seq`,
   approvals endpoint, generated TypeScript types with a CI drift check.~~ (done)
 - Planner stage: an agent writes `plan.json` (validated as a DAG); optional
   human plan approval.
@@ -81,7 +81,7 @@ cannot read files outside its workspace or reach hosts outside its allowlist.
   evidence.
 - Footprint prediction and file reservations; conflict prediction against
   open PRs; best-of-N attempts with side-by-side comparison.
-- `forgeline bench`: mine merged PRs from your repos into SWE-bench-style
+- `bodega bench`: mine merged PRs from your repos into SWE-bench-style
   tasks and measure resolve rate, regressions and cost per change.
 - Postgres storage backend; OpenTelemetry export; E2B backend.
 
@@ -90,7 +90,7 @@ set of open-source repositories.
 
 ## M5 — Everywhere
 
-- Forgeline as an ACP agent and an MCP server, so editors and other agents can
+- Bodega as an ACP agent and an MCP server, so editors and other agents can
   start and steer runs.
 - Distributed workers (Agent Substrate / AX / Kubernetes) for large swarms.
 - Multi-repo runs and stacked PRs.

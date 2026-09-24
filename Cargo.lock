@@ -171,6 +171,133 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "bodega-agents"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bodega-core",
+ "nix",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "bodega-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bodega-agents",
+ "bodega-config",
+ "bodega-core",
+ "bodega-engine",
+ "bodega-server",
+ "bodega-store",
+ "bodega-workspace",
+ "clap",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "bodega-config"
+version = "0.1.0"
+dependencies = [
+ "bodega-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "toml",
+ "ts-rs",
+]
+
+[[package]]
+name = "bodega-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "ts-rs",
+ "uuid",
+]
+
+[[package]]
+name = "bodega-engine"
+version = "0.1.0"
+dependencies = [
+ "bodega-agents",
+ "bodega-config",
+ "bodega-core",
+ "bodega-store",
+ "bodega-workspace",
+ "nix",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "bodega-server"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "axum",
+ "bodega-agents",
+ "bodega-config",
+ "bodega-core",
+ "bodega-engine",
+ "bodega-store",
+ "bodega-workspace",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tower-http 0.7.1",
+ "tracing",
+ "ts-rs",
+]
+
+[[package]]
+name = "bodega-store"
+version = "0.1.0"
+dependencies = [
+ "bodega-core",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "ts-rs",
+]
+
+[[package]]
+name = "bodega-workspace"
+version = "0.1.0"
+dependencies = [
+ "bodega-core",
+ "serde",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -306,133 +433,6 @@ name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
-
-[[package]]
-name = "forgeline-agents"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "forgeline-core",
- "nix",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "forgeline-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "forgeline-agents",
- "forgeline-config",
- "forgeline-core",
- "forgeline-engine",
- "forgeline-server",
- "forgeline-store",
- "forgeline-workspace",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "forgeline-config"
-version = "0.1.0"
-dependencies = [
- "forgeline-core",
- "serde",
- "serde_json",
- "thiserror",
- "toml",
- "ts-rs",
-]
-
-[[package]]
-name = "forgeline-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
- "ts-rs",
- "uuid",
-]
-
-[[package]]
-name = "forgeline-engine"
-version = "0.1.0"
-dependencies = [
- "forgeline-agents",
- "forgeline-config",
- "forgeline-core",
- "forgeline-store",
- "forgeline-workspace",
- "nix",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "forgeline-server"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "axum",
- "forgeline-agents",
- "forgeline-config",
- "forgeline-core",
- "forgeline-engine",
- "forgeline-store",
- "forgeline-workspace",
- "futures-util",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tower-http 0.7.1",
- "tracing",
- "ts-rs",
-]
-
-[[package]]
-name = "forgeline-store"
-version = "0.1.0"
-dependencies = [
- "forgeline-core",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "ts-rs",
-]
-
-[[package]]
-name = "forgeline-workspace"
-version = "0.1.0"
-dependencies = [
- "forgeline-core",
- "serde",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
 
 [[package]]
 name = "form_urlencoded"

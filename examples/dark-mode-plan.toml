@@ -1,5 +1,5 @@
 # An example plan: four tasks, two of which can run in parallel.
-#   forgeline run "Add dark mode" --plan examples/dark-mode-plan.toml
+#   bodega run "Add dark mode" --plan examples/dark-mode-plan.toml
 summary = "Dark mode: tokens, toggle, persistence, docs"
 
 [[tasks]]

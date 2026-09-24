@@ -1,0 +1,33 @@
+[package]
+name = "bodega-server"
+description = "HTTP API and live event stream for Bodega, for UIs, bots and scripts."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ts-rs.workspace = true
+async-stream = "0.3.6"
+axum = "0.8.9"
+bodega-config.workspace = true
+bodega-core.workspace = true
+bodega-engine.workspace = true
+bodega-store.workspace = true
+futures-util = "0.3.34"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower-http = { version = "0.7.1", features = ["cors", "fs"] }
+tracing.workspace = true
+
+[dev-dependencies]
+bodega-agents.workspace = true
+bodega-workspace.workspace = true
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "stream"] }
+tempfile = "3.27.0"
+ts-rs.workspace = true
+
+[lints]
+workspace = true

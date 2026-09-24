@@ -1,6 +1,6 @@
 # What we learned from 30+ agent-orchestration projects
 
-This is the cross-project synthesis behind Forgeline's design. The per-project
+This is the cross-project synthesis behind Bodega's design. The per-project
 notes (with file-level citations into each codebase) are in this folder:
 
 | Notes | Projects |
@@ -31,7 +31,7 @@ standing in for a scheduler, a prompt standing in for a permission system).
  │ Work ledger               beads, Linear/GitHub (Symphony), spec-kit docs  │
  ├──────────────────────────────────────────────────────────────────────────┤
  │ Orchestrator / factory    Symphony, Kata, OpenFactory, Open SWE,          │
- │                           Gas Town, new-wave factories   ← Forgeline      │
+ │                           Gas Town, new-wave factories   ← Bodega      │
  ├──────────────────────────────────────────────────────────────────────────┤
  │ Agent harness             Claude Code, Codex, Goose, OpenHands SDK, axe,  │
  │                           mini-swe-agent  (reached via stream-json/ACP/…) │
@@ -40,7 +40,7 @@ standing in for a scheduler, a prompt standing in for a permission system).
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Forgeline's job is the orchestrator layer, done properly, with first-class
+Bodega's job is the orchestrator layer, done properly, with first-class
 seams to every other layer: a ledger adapter below the UI, an agent-adapter
 layer, and a workspace-backend layer.
 
@@ -73,7 +73,7 @@ for judgment (planning, implementing, reviewing). Gas Town is the cautionary
 tale: its merge queue and supervisors are LLM checklists, while the
 deterministic Go versions sit unused (`internal/refinery/batch.go` is only
 called from tests). MetaGPT and ChatDev both abandoned role-play chat for
-tool-using workers (07). → Forgeline's engine is a Rust state machine; agents
+tool-using workers (07). → Bodega's engine is a Rust state machine; agents
 are workers it dispatches.
 
 **2. One owner of state, reconcile before acting.** Symphony (one GenServer),

@@ -1,6 +1,6 @@
-# Forgeline architecture
+# Bodega architecture
 
-Forgeline is an open-source software factory: it takes work items (a feature
+Bodega is an open-source software factory: it takes work items (a feature
 request, an issue, a bug report), turns them into a plan of tasks, runs a swarm
 of coding agents on those tasks in isolated workspaces, verifies and reviews
 their work, integrates it and hands back a pull request — with a live,
@@ -32,9 +32,9 @@ everything else is the plan.
 
 - Being a general workflow engine. Pipelines are purpose-built for software
   work.
-- Hosting models or agents. Forgeline drives existing harnesses.
+- Hosting models or agents. Bodega drives existing harnesses.
 - Replacing the issue tracker. GitHub/Linear/beads stay the ledger when a team
-  already has one; Forgeline has a built-in ledger for everyone else.
+  already has one; Bodega has a built-in ledger for everyone else.
 
 ---
 
@@ -48,11 +48,11 @@ everything else is the plan.
    audit and evals all read the same log.
 3. **One owner per run.** A single engine task owns a run's state and
    reconciles with reality (git, processes, the tracker) before acting.
-4. **Agents produce artifacts; Forgeline applies effects.** Agents never hold
+4. **Agents produce artifacts; Bodega applies effects.** Agents never hold
    forge or tracker credentials. They leave commits and result files; a trusted
    publisher pushes branches, opens PRs and posts comments.
 5. **Verification is code, not a prompt.** Check commands come from the trusted
-   base branch, run on the host (or the sandbox) under Forgeline's control, and
+   base branch, run on the host (or the sandbox) under Bodega's control, and
    produce proof records bound to exact commits.
 6. **Every loop is capped and every exit is typed.** Retries, fix rounds and
    review loops have limits; runs and tasks end in explicit terminal states with
@@ -68,7 +68,7 @@ everything else is the plan.
 ## 3. System overview
 
 ```
-  work sources                         forgeline (one process)                              outputs
+  work sources                         bodega (one process)                              outputs
  ─────────────                ────────────────────────────────────────────────           ─────────
   CLI / UI request ──┐        ┌──────────────┐   commands   ┌───────────────────┐
   GitHub issues ─────┼──────▶ │    Engine    │ ───────────▶ │ Agent supervisor  │──▶ agent processes
@@ -95,14 +95,14 @@ everything else is the plan.
 
 | Crate | Responsibility | Status |
 |---|---|---|
-| `forgeline-core` | Ids, domain model, events, `RunState` fold, dependency graph, budgets. No I/O. | **built** |
-| `forgeline-store` | Append-only event log on SQLite, validation in the write transaction, idempotency keys, run summaries, live subscriptions. | **built** |
-| `forgeline-workspace` | Workspace backends. Git layer (worktrees, commits, diffs, merges) today; `WorkspaceBackend` trait, OS sandbox, Docker, E2B later. | git layer **built** |
-| `forgeline-agents` | `AgentRuntime` trait, adapters (Claude Code, Codex, ACP, mock), normalization into `AgentEvent`, capabilities. | Claude Code + mock **built** |
-| `forgeline-engine` | Per-run driver: pure scheduling decisions, dispatch, concurrency limits, retries, verification, integration, approvals, recovery. | **built** (review: M2) |
-| `forgeline-config` | `forgeline.toml`, plans, permission policy; pipelines and role prompts later. | **built** |
-| `forgeline-server` | axum REST + resumable SSE stream; serves the UI; generated TypeScript types. | **built** |
-| `forgeline-cli` | The `forgeline` binary: `init`, `run`, `resume`, `runs`, `show`, `events`, `approvals`, `approve`, `serve`, `doctor`. | **built** |
+| `bodega-core` | Ids, domain model, events, `RunState` fold, dependency graph, budgets. No I/O. | **built** |
+| `bodega-store` | Append-only event log on SQLite, validation in the write transaction, idempotency keys, run summaries, live subscriptions. | **built** |
+| `bodega-workspace` | Workspace backends. Git layer (worktrees, commits, diffs, merges) today; `WorkspaceBackend` trait, OS sandbox, Docker, E2B later. | git layer **built** |
+| `bodega-agents` | `AgentRuntime` trait, adapters (Claude Code, Codex, ACP, mock), normalization into `AgentEvent`, capabilities. | Claude Code + mock **built** |
+| `bodega-engine` | Per-run driver: pure scheduling decisions, dispatch, concurrency limits, retries, verification, integration, approvals, recovery. | **built** (review: M2) |
+| `bodega-config` | `bodega.toml`, plans, permission policy; pipelines and role prompts later. | **built** |
+| `bodega-server` | axum REST + resumable SSE stream; serves the UI; generated TypeScript types. | **built** |
+| `bodega-cli` | The `bodega` binary: `init`, `run`, `resume`, `runs`, `show`, `events`, `approvals`, `approve`, `serve`, `doctor`. | **built** |
 | `ui/` | The web app (open for design). Consumes only the public API. | M3 |
 
 ---
@@ -138,7 +138,7 @@ All ids are UUIDv7 (time-ordered) with a type prefix (`run_…`, `task_…`,
 
 ## 6. Event log and durability (built: log, validation, idempotency; planned: leases, timers, outbox)
 
-**Schema** (`forgeline-store`):
+**Schema** (`bodega-store`):
 
 - `events(seq INTEGER PRIMARY KEY AUTOINCREMENT, run_id, at_ms, type, payload, payload_version)`
 - `runs(run_id, status, updated_at_ms, summary)`: list-view projection updated in the same transaction
@@ -257,7 +257,7 @@ Trivial work skips 1, 2 and 6. Bugs require a failing reproduction test first.
 **Configuration** lives in the repository so it is versioned with the code:
 
 ```toml
-# forgeline.toml
+# bodega.toml
 [project]
 base_ref = "main"
 
@@ -281,7 +281,7 @@ max_fix_rounds = 3
 max_cost_usd = 25.0
 ```
 
-Role prompts are Markdown files in `.forgeline/roles/<role>.md` with an
+Role prompts are Markdown files in `.bodega/roles/<role>.md` with an
 override stack (built-in → user → repo). Their content hash is recorded in each
 run so behavior is reproducible.
 
@@ -299,7 +299,7 @@ Three layers, following vibe-kanban's executor design:
 2. **Adapters**: one per agent. Know the command line, version pin, how to
    resume a session, how permissions are asked, and map native messages into
    `AgentEvent`.
-3. **Normalized events** (built, `forgeline_core::AgentEvent`):
+3. **Normalized events** (built, `bodega_core::AgentEvent`):
    `session_started`, `message`, `thinking`, `tool_call`, `tool_result`,
    `permission_requested`, `usage` (cumulative), `log`, `finished`.
 
@@ -343,7 +343,7 @@ approval.
   CLI's `can_use_tool` requests (`allow` with optional rewritten input, or
   `deny`) travel on the same pipes. Stdout carries `system/init`, `assistant`,
   `user` (tool results), `system/session_state_changed`, rate-limit events and
-  a `result` per turn with `total_cost_usd`, usage and `session_id`. Forgeline
+  a `result` per turn with `total_cost_usd`, usage and `session_id`. Bodega
   generates the session id itself (`--session-id`) so it never has to scrape
   it, passes untrusted values as `--flag=value`, strips `CLAUDECODE` from the
   environment and isolates state with `CLAUDE_CONFIG_DIR` per workspace.
@@ -351,7 +351,7 @@ approval.
   `item.*`, `turn.completed{usage}`) for the first adapter;
   `codex app-server` (JSON-RPC: `thread/start|resume`, `turn/start|steer|interrupt`,
   approval requests, `turn/diff/updated`) for full control. Codex reports
-  tokens but not dollars; Forgeline prices usage from a model table.
+  tokens but not dollars; Bodega prices usage from a model table.
 - **Everything else via ACP v1** (`agent-client-protocol` crate): Gemini CLI,
   Goose, OpenCode, Cursor, Copilot and ~40 other agents. ACP lacks cost and
   turn ids, so it is the universal fallback rather than the path for Claude and
@@ -361,18 +361,18 @@ approval.
 `codex` (`exec --json`, then app-server) → `acp` → `builtin` (a small
 mini-swe-agent-style loop on the model APIs for environments without any CLI)
 → a replay adapter that plays back recorded transcripts for tests. Later,
-Forgeline itself is exposed as an ACP agent and an MCP server
+Bodega itself is exposed as an ACP agent and an MCP server
 (`start_run`, `send_message`, `view_run`, `interrupt`) so editors and other
 agents can drive the factory.
 
-Every adapter probes the installed agent version at startup (`forgeline
+Every adapter probes the installed agent version at startup (`bodega
 doctor`) because CLI flags drift between releases.
 
 ---
 
 ## 10. Workspaces and sandboxing (M1: worktrees; M3: OS sandbox, Docker; later: E2B, Substrate)
 
-Every attempt gets its own workspace on its own branch (`forgeline/<run>/<task>-<n>`).
+Every attempt gets its own workspace on its own branch (`bodega/<run>/<task>-<n>`).
 The engine talks to workspaces only through traits, so backends are swappable:
 
 ```rust
@@ -402,7 +402,7 @@ pub trait Workspace: Send + Sync {
 - **Secrets are references**, resolved as far outside the sandbox as the
   backend allows (egress header injection > per-exec env > file). Never in
   templates, snapshots or logs.
-- **Code leaves only through git.** Forgeline commits whatever the agent left
+- **Code leaves only through git.** Bodega commits whatever the agent left
   uncommitted, and reports anything excluded (for example, writes under
   `.github/workflows` are dropped unless the role is allowed to change CI).
 - **Backend order**: git worktree (+ Landlock/bubblewrap on Linux, Seatbelt on
@@ -412,7 +412,7 @@ pub trait Workspace: Send + Sync {
 
 ## 11. Verification, proof and review (built: checks from the base branch, fix rounds, post-merge checks; next: proof records, review)
 
-- **Checks** (`build`, `lint`, `test`, …) are read from `forgeline.toml` *on the
+- **Checks** (`build`, `lint`, `test`, …) are read from `bodega.toml` *on the
   base ref*, so an agent cannot weaken its own gate by editing the config.
 - Each check produces a `CheckResult` and, in M2, a **`ProofRecord`**:
   `{tree_hash, commit, command, exit_code, output_sha256, duration}`. Only a
@@ -434,7 +434,7 @@ pub trait Workspace: Send + Sync {
 ## 12. Integration and publishing (built: serial merge queue into the integration branch; next: publisher + PRs)
 
 - A **merge queue** per run integrates verified task branches one at a time
-  into `forgeline/<run>/integration`: rebase/merge → re-run checks → advance.
+  into `bodega/<run>/integration`: rebase/merge → re-run checks → advance.
   A conflict produces `merge_conflict` and the task is re-attempted on top of
   the new head with the conflict as feedback.
 - The **publisher** is the only component holding forge credentials. It
@@ -449,7 +449,7 @@ pub trait Workspace: Send + Sync {
 
 Approvals are durable objects: plan approval, merge approval, agent questions
 and permission escalations. Each has an id, a title, details, an optional
-timeout with a default decision, and is resolved by `forgeline approve <id>`,
+timeout with a default decision, and is resolved by `bodega approve <id>`,
 the API or the UI.
 
 The server computes an **attention state** per run and per attempt, which the
@@ -490,10 +490,10 @@ conflict prediction, and first-class verification badges.
   tracker tokens inside workspaces.
 - Inputs from issues and comments are untrusted: stripped of hidden content,
   and repository-controlled agent config (`CLAUDE.md`, `.mcp.json`,
-  `forgeline.toml`) is read from the base branch.
+  `bodega.toml`) is read from the base branch.
 - No auto-approval of permission prompts; unknown requests escalate.
 - The API binds to localhost by default; remote access requires a token.
-- Agent binaries are version-pinned per adapter and checked by `forgeline doctor`.
+- Agent binaries are version-pinned per adapter and checked by `bodega doctor`.
 
 ---
 
@@ -507,7 +507,7 @@ dashboard needs is also derivable from the event log.
 
 ## 17. Measuring the factory (M4)
 
-`forgeline bench` mines merged, issue-linked PRs from your own repositories into
+`bodega bench` mines merged, issue-linked PRs from your own repositories into
 SWE-bench-style tasks (base commit, problem statement, hidden tests with
 FAIL_TO_PASS / PASS_TO_PASS), runs them through the real pipeline in eval mode
 (tests hidden, gates answered by a script, no PRs) and reports resolve rate,

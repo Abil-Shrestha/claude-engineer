@@ -1,16 +1,19 @@
-# Forgeline
+# Bodega
 
-**An open-source software factory: orchestrate swarms of coding agents from
-work item to verified, integrated code.**
+**The corner store for coding agents: open 24/7, a whole crew behind the
+counter, and nothing leaves until it's checked.**
 
-Give Forgeline a request and a plan. It runs a swarm of coding agents in
+Bodega is an open-source software factory. It orchestrates swarms of coding
+agents from work item to verified, integrated code.
+
+Give Bodega a request and a plan. It runs a swarm of coding agents in
 parallel, each in its own git worktree, verifies every change with your own
 checks, merges the verified work one task at a time, retries what fails with
 feedback, asks a human only when policy says so, and records every step in an
 event log you can watch live, replay, and build a UI on.
 
 ```
-$ forgeline run "Add dark mode" --plan plan.toml --parallel 2 --agent mock
+$ bodega run "Add dark mode" --plan plan.toml --parallel 2 --agent mock
 started run_01a0d48f111d747688bc3d7cfd14e3c2
 run running
 ▶ tokens attempt 1 (mock)
@@ -45,12 +48,12 @@ back to the agent as feedback before a task is retried.)
 We read the code of 30+ projects in this space (Symphony, Open SWE,
 OpenHands, Gas Town, vibe-kanban, AX, Agent Substrate and many more) before
 writing a line. The [synthesis](research/SYNTHESIS.md) is worth reading on its
-own. Forgeline is built on what that research says works:
+own. Bodega is built on what that research says works:
 
 - **Deterministic core, LLMs at the edges.** Scheduling, retries, merging and
   budgets are tested Rust state machines, not prompts.
 - **Verification is code.** Checks come from the base branch, run under
-  Forgeline's control, and gate every merge. Agents can't grade their own work.
+  Bodega's control, and gate every merge. Agents can't grade their own work.
 - **One worktree per attempt, one merge at a time.** Agents never share a
   working copy, and verified work lands through a serial merge queue that
   re-runs checks on the combined code.
@@ -64,12 +67,12 @@ own. Forgeline is built on what that research says works:
 ## Quick start
 
 ```sh
-cargo install --path crates/forgeline-cli
+cargo install --path crates/bodega-cli
 cd your-project
-forgeline init                                   # forgeline.toml + .gitignore
-forgeline run "Say hello" --agent mock           # try it, no tokens spent
-forgeline run "Fix the flaky retry test"         # for real, with Claude Code
-forgeline serve                                  # API + live stream on :7777
+bodega init                                   # bodega.toml + .gitignore
+bodega run "Say hello" --agent mock           # try it, no tokens spent
+bodega run "Fix the flaky retry test"         # for real, with Claude Code
+bodega serve                                  # API + live stream on :7777
 ```
 
 Full guide: [GETTING_STARTED.md](GETTING_STARTED.md).
@@ -88,21 +91,21 @@ Full guide: [GETTING_STARTED.md](GETTING_STARTED.md).
 
 | Crate | What it does |
 |---|---|
-| `forgeline-core` | Ids, domain model, events, `RunState` fold, task graph, budgets (no I/O) |
-| `forgeline-store` | SQLite event log: validated appends, idempotency, live subscriptions |
-| `forgeline-workspace` | Git worktrees, commits, diffs, merges |
-| `forgeline-agents` | Agent runtimes: Claude Code (stream-json), scripted mock |
-| `forgeline-config` | `forgeline.toml`, plans, permission policy |
-| `forgeline-engine` | Scheduling, attempts, checks, fix rounds, merge queue, retries, approvals, recovery |
-| `forgeline-server` | HTTP API, SSE stream, generated TypeScript types |
-| `forgeline-cli` | The `forgeline` binary |
+| `bodega-core` | Ids, domain model, events, `RunState` fold, task graph, budgets (no I/O) |
+| `bodega-store` | SQLite event log: validated appends, idempotency, live subscriptions |
+| `bodega-workspace` | Git worktrees, commits, diffs, merges |
+| `bodega-agents` | Agent runtimes: Claude Code (stream-json), scripted mock |
+| `bodega-config` | `bodega.toml`, plans, permission policy |
+| `bodega-engine` | Scheduling, attempts, checks, fix rounds, merge queue, retries, approvals, recovery |
+| `bodega-server` | HTTP API, SSE stream, generated TypeScript types |
+| `bodega-cli` | The `bodega` binary |
 
 ## Contributing
 
 `cargo fmt --all && cargo clippy --workspace --all-targets && cargo test
 --workspace` must pass (CI runs exactly that). Every behavior change comes with
 a test; scheduling changes come with a test of the pure functions in
-`forgeline-engine/src/schedule.rs`. Pick an item from the
+`bodega-engine/src/schedule.rs`. Pick an item from the
 [roadmap](ROADMAP.md) and open an issue that names it.
 
 ## License

@@ -11,13 +11,13 @@ repository = "https://github.com/Abil-Shrestha/claude-engineer"
 description = "An open-source software factory: orchestrate swarms of coding agents from work item to reviewed pull request."
 
 [workspace.dependencies]
-forgeline-core = { path = "crates/forgeline-core" }
-forgeline-config = { path = "crates/forgeline-config" }
-forgeline-store = { path = "crates/forgeline-store" }
-forgeline-workspace = { path = "crates/forgeline-workspace" }
-forgeline-agents = { path = "crates/forgeline-agents" }
-forgeline-engine = { path = "crates/forgeline-engine" }
-forgeline-server = { path = "crates/forgeline-server" }
+bodega-core = { path = "crates/bodega-core" }
+bodega-config = { path = "crates/bodega-config" }
+bodega-store = { path = "crates/bodega-store" }
+bodega-workspace = { path = "crates/bodega-workspace" }
+bodega-agents = { path = "crates/bodega-agents" }
+bodega-engine = { path = "crates/bodega-engine" }
+bodega-server = { path = "crates/bodega-server" }
 
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

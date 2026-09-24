@@ -1,5 +1,5 @@
-// Generated from Forgeline's Rust types. Do not edit by hand.
-// Regenerate: UPDATE_TYPES=1 cargo test -p forgeline-server --test typescript
+// Generated from Bodega's Rust types. Do not edit by hand.
+// Regenerate: UPDATE_TYPES=1 cargo test -p bodega-server --test typescript
 
 export type RunId = string;
 

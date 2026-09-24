@@ -1,0 +1,33 @@
+[package]
+name = "bodega-cli"
+description = "The bodega command: run swarms of coding agents from the terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bodega"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4.6.7", features = ["derive", "env"] }
+bodega-agents.workspace = true
+bodega-config.workspace = true
+bodega-core.workspace = true
+bodega-engine.workspace = true
+bodega-server.workspace = true
+bodega-store.workspace = true
+bodega-workspace.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
