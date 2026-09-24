@@ -2,7 +2,7 @@
 
 ## Install
 
-Forgeline is a single Rust binary. With a Rust toolchain (1.85+):
+Forgeline is a single Rust binary. With a Rust toolchain (1.88+):
 
 ```sh
 git clone https://github.com/Abil-Shrestha/claude-engineer forgeline

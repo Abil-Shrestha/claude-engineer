@@ -54,7 +54,10 @@ already resolved) or `415` (mutations must send `Content-Type:
 application/json`).
 
 **Auth.** With `--token`, send `Authorization: Bearer <token>`. `EventSource`
-cannot set headers, so every endpoint also accepts `?token=<token>`.
+cannot set headers, so every endpoint also accepts `?token=<token>`. Without a
+token, the server only answers requests addressed to `localhost` or a loopback
+IP (`Host` header), which blocks DNS-rebinding attacks from web pages; it
+refuses to listen on a non-loopback address without a token.
 
 ### Start a run
 

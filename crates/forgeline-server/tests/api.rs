@@ -329,6 +329,34 @@ async fn approvals_are_listed_and_resolved_over_http() {
 }
 
 #[tokio::test]
+async fn without_a_token_only_local_hosts_are_served() {
+    let server = start(MockAgent::demo(), None).await;
+    let rebound = server
+        .client
+        .get(server.url("/api/runs"))
+        .header("host", "evil.example:7777")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(rebound.status(), 403);
+    for host in [
+        "localhost:7777",
+        "127.0.0.1:7777",
+        "[::1]:7777",
+        "LOCALHOST",
+    ] {
+        let local = server
+            .client
+            .get(server.url("/api/runs"))
+            .header("host", host)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(local.status(), 200, "{host}");
+    }
+}
+
+#[tokio::test]
 async fn a_token_protects_every_endpoint() {
     let server = start(MockAgent::demo(), Some("s3cret")).await;
     let denied = server

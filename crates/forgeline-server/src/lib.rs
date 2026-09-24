@@ -19,6 +19,8 @@
 //!
 //! Security: bind to localhost (the default); optionally require a bearer
 //! token (`?token=` also works, since `EventSource` cannot set headers).
+//! Without a token, requests must address `localhost`/a loopback IP in their
+//! `Host` header, which defeats DNS-rebinding attacks from web pages.
 //! Mutations only accept `application/json`, which cross-site forms cannot
 //! send, and no CORS is enabled unless origins are explicitly allowed.
 
@@ -157,6 +159,16 @@ pub async fn serve(engine: Engine, options: ServerOptions) -> std::io::Result<()
 
 async fn require_token(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let Some(expected) = &state.token else {
+        // Without a token the API trusts local callers, so make sure the
+        // caller really addressed this machine: a page on another domain that
+        // rebinds its DNS to 127.0.0.1 still sends its own name as `Host`.
+        if !is_local_host(request.headers()) {
+            return ApiError(
+                StatusCode::FORBIDDEN,
+                "requests must address localhost (or run the server with --token)".into(),
+            )
+            .into_response();
+        }
         return next.run(request).await;
     };
     let from_header = request
@@ -174,6 +186,23 @@ async fn require_token(State(state): State<AppState>, request: Request, next: Ne
     } else {
         ApiError(StatusCode::UNAUTHORIZED, "missing or invalid token".into()).into_response()
     }
+}
+
+/// Whether the `Host` header names the loopback interface.
+fn is_local_host(headers: &HeaderMap) -> bool {
+    let Some(host) = headers.get(header::HOST).and_then(|h| h.to_str().ok()) else {
+        return false;
+    };
+    let name = if let Some(rest) = host.strip_prefix('[') {
+        // IPv6 literal: `[::1]:7777`.
+        rest.split(']').next().unwrap_or("")
+    } else {
+        host.rsplit_once(':').map_or(host, |(name, _port)| name)
+    };
+    name.eq_ignore_ascii_case("localhost")
+        || name
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
