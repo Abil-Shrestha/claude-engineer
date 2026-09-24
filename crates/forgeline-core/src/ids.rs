@@ -21,7 +21,8 @@ pub struct ParseIdError {
 macro_rules! define_id {
     ($(#[$meta:meta])* $name:ident, $prefix:literal) => {
         $(#[$meta])*
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, ts_rs::TS)]
+        #[ts(type = "string")]
         pub struct $name(Uuid);
 
         impl $name {

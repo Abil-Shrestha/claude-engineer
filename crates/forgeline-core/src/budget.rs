@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Token and cost usage reported by an agent (or summed over many).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct Usage {
     pub input_tokens: u64,
     pub output_tokens: u64,
@@ -50,7 +50,7 @@ impl std::iter::Sum for Usage {
 }
 
 /// Limits for a run or a single attempt. `None` means unlimited.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(default)]
 pub struct Budget {
     pub max_cost_usd: Option<f64>,
@@ -72,7 +72,7 @@ impl Default for Budget {
 }
 
 /// Which limit was crossed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS, thiserror::Error)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BudgetExceeded {
     #[error("cost ${spent:.2} exceeded the ${limit:.2} budget")]

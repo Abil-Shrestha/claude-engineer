@@ -40,7 +40,7 @@ pub enum ApplyError {
     ApprovalAlreadyResolved(ApprovalId),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct TaskState {
     pub id: TaskId,
     pub spec: TaskSpec,
@@ -54,14 +54,14 @@ pub struct TaskState {
     pub last_integration_error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct Review {
     pub reviewer: AgentRef,
     pub verdict: ReviewVerdict,
     pub findings: Vec<Finding>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct AttemptState {
     pub id: AttemptId,
     pub task_id: TaskId,
@@ -89,7 +89,7 @@ impl AttemptState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct Resolution {
     pub decision: Decision,
     pub by: String,
@@ -97,7 +97,7 @@ pub struct Resolution {
     pub at_ms: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct ApprovalState {
     pub id: ApprovalId,
     pub kind: ApprovalKind,
@@ -108,14 +108,14 @@ pub struct ApprovalState {
     pub resolution: Option<Resolution>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct PullRequest {
     pub url: String,
     pub number: Option<u64>,
 }
 
 /// The current state of one run.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct RunState {
     pub id: RunId,
     pub spec: RunSpec,
@@ -131,6 +131,8 @@ pub struct RunState {
     pub updated_at_ms: i64,
     /// Sequence number of the last event applied.
     pub last_seq: u64,
+    /// Task key → id index (internal; clients use `tasks`).
+    #[ts(skip)]
     task_keys: BTreeMap<String, TaskId>,
 }
 

@@ -14,7 +14,7 @@ use crate::model::{
 };
 
 /// A stored event: a change plus where it sits in the log.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct Event {
     /// Position in the global log. Gapless and strictly increasing, so a
     /// client that saw `seq = n` resumes with "everything after n".
@@ -26,7 +26,7 @@ pub struct Event {
     pub kind: EventKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventKind {
     RunCreated {
@@ -141,7 +141,7 @@ impl EventKind {
 
 /// What an agent did, normalized across Claude Code, Codex, ACP agents and
 /// any other runtime. Adapters map their native stream into these.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AgentEvent {
     SessionStarted {
@@ -182,7 +182,7 @@ pub enum AgentEvent {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum LogLevel {
     Debug,

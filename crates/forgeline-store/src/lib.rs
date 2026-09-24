@@ -49,7 +49,7 @@ pub enum StoreError {
 pub type Result<T, E = StoreError> = std::result::Result<T, E>;
 
 /// One row of the `runs` table: enough to list runs without replaying them.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct RunSummary {
     pub run_id: RunId,
     pub title: String,

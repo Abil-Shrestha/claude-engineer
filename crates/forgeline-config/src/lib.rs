@@ -301,7 +301,7 @@ fn rule_matches(rule: &str, tool: &str, subject: &str) -> bool {
 }
 
 /// A plan written by hand or by a planner agent.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(deny_unknown_fields)]
 pub struct Plan {
     #[serde(default)]
@@ -309,7 +309,7 @@ pub struct Plan {
     pub tasks: Vec<PlanTask>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(deny_unknown_fields)]
 pub struct PlanTask {
     pub key: String,

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::budget::Budget;
 
 /// Where a run's work came from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WorkSource {
     /// Typed into the CLI or UI.
@@ -28,7 +28,7 @@ pub enum WorkSource {
 }
 
 /// Everything needed to start a run.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 pub struct RunSpec {
     pub title: String,
     /// The request itself: an issue body, a feature description, a bug report.
@@ -42,7 +42,7 @@ pub struct RunSpec {
     pub budget: Budget,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     Pending,
@@ -61,7 +61,7 @@ impl RunStatus {
 }
 
 /// One unit of work in a run's plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 pub struct TaskSpec {
     /// Stable, human-readable key within the run (e.g. `T001`). Plans refer to
     /// dependencies by key so they can be written before ids exist.
@@ -77,7 +77,9 @@ pub struct TaskSpec {
     pub acceptance: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ts_rs::TS,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     /// Waiting for dependencies.
@@ -103,7 +105,7 @@ impl TaskStatus {
 }
 
 /// Which agent runtime (and model) did something.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 pub struct AgentRef {
     /// Adapter name, e.g. `claude-code`, `codex`, `acp:gemini`.
     pub runtime: String,
@@ -111,7 +113,7 @@ pub struct AgentRef {
 }
 
 /// Why an attempt failed. The engine's retry policy keys off this.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureKind {
     /// The agent crashed, errored or gave up.
@@ -134,7 +136,7 @@ impl FailureKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum AttemptOutcome {
     Succeeded {
@@ -149,7 +151,7 @@ pub enum AttemptOutcome {
 }
 
 /// Result of a deterministic check (build, lint, test command).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 pub struct CheckResult {
     pub name: String,
     pub command: String,
@@ -161,7 +163,7 @@ pub struct CheckResult {
     pub output_tail: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewVerdict {
     Approve,
@@ -171,7 +173,7 @@ pub enum ReviewVerdict {
 }
 
 /// How a review finding should be handled (triage categories).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum FindingKind {
     /// A defect in the change; send back to the implementer.
@@ -186,7 +188,7 @@ pub enum FindingKind {
     Reject,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 pub struct Finding {
     pub kind: FindingKind,
     pub message: String,
@@ -194,7 +196,7 @@ pub struct Finding {
     pub line: Option<u32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalKind {
     Plan,
@@ -205,7 +207,7 @@ pub enum ApprovalKind {
     Permission,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum Decision {
     Approved,

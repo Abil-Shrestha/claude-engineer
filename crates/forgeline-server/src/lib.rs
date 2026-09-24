@@ -247,22 +247,26 @@ async fn list_runs(State(state): State<AppState>) -> ApiResult<Json<Vec<RunSumma
 }
 
 /// Body of `POST /api/runs`.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ts_rs::TS)]
 #[serde(deny_unknown_fields)]
 pub struct CreateRun {
     pub title: String,
     #[serde(default)]
+    #[ts(optional)]
     pub request: Option<String>,
     /// Without a plan, the whole request is one task.
     #[serde(default)]
+    #[ts(optional)]
     pub plan: Option<Plan>,
     #[serde(default)]
+    #[ts(optional)]
     pub base_ref: Option<String>,
     #[serde(default)]
+    #[ts(optional)]
     pub max_cost_usd: Option<f64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ts_rs::TS)]
 pub struct Created {
     pub run_id: RunId,
 }
@@ -347,7 +351,7 @@ async fn resume_run(
 }
 
 /// A pending approval with the run it belongs to.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ts_rs::TS)]
 pub struct PendingApproval {
     pub run_id: RunId,
     pub run_title: String,
@@ -372,13 +376,15 @@ async fn list_approvals(State(state): State<AppState>) -> ApiResult<Json<Vec<Pen
 }
 
 /// Body of `POST /api/approvals/{id}`.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ts_rs::TS)]
 #[serde(deny_unknown_fields)]
 pub struct Resolve {
     pub decision: Decision,
     #[serde(default)]
+    #[ts(optional)]
     pub comment: Option<String>,
     #[serde(default)]
+    #[ts(optional)]
     pub by: Option<String>,
 }
 
