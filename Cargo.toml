@@ -17,6 +17,7 @@ forgeline-store = { path = "crates/forgeline-store" }
 forgeline-workspace = { path = "crates/forgeline-workspace" }
 forgeline-agents = { path = "crates/forgeline-agents" }
 forgeline-engine = { path = "crates/forgeline-engine" }
+forgeline-server = { path = "crates/forgeline-server" }
 
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

@@ -110,6 +110,27 @@ enum Command {
     },
     /// Check that everything Forgeline needs is installed and configured.
     Doctor,
+    /// Serve the HTTP API and live event stream (for the web UI, bots, scripts).
+    Serve {
+        /// Address to listen on. Keep it on localhost unless you set --token.
+        #[arg(long, default_value = "127.0.0.1:7777")]
+        addr: std::net::SocketAddr,
+        /// Require this bearer token on every request (or FORGELINE_TOKEN).
+        #[arg(long, env = "FORGELINE_TOKEN", hide_env_values = true)]
+        token: Option<String>,
+        /// Browser origins allowed to call the API (e.g. http://localhost:5173).
+        #[arg(long = "allow-origin", value_name = "ORIGIN")]
+        allow_origins: Vec<String>,
+        /// A built web UI to serve at `/`.
+        #[arg(long, value_name = "DIR")]
+        ui: Option<PathBuf>,
+        /// Continue unfinished runs on startup.
+        #[arg(long)]
+        resume: bool,
+        /// Use this agent runtime for every role.
+        #[arg(long)]
+        agent: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -272,6 +293,48 @@ async fn dispatch(cli: Cli) -> Result<()> {
             Ok(())
         }
         Command::Doctor => doctor(&start).await,
+        Command::Serve {
+            addr,
+            token,
+            allow_origins,
+            ui,
+            resume,
+            agent,
+        } => {
+            if !addr.ip().is_loopback() && token.is_none() {
+                bail!(
+                    "refusing to listen on {addr} without --token: anyone who can reach it could \
+                     start agents on this machine"
+                );
+            }
+            let project = Project::open(&start, None).await?;
+            let mut config = project.config.clone();
+            override_agents(&mut config, agent.as_deref(), None);
+            let engine = project.engine(config)?;
+            outln!(
+                "{} http://{addr}  {}",
+                ui::bold("forgeline serve"),
+                ui::dim(&format!("repo {}", project.repo.root().display()))
+            );
+            outln!(
+                "{}",
+                ui::dim(
+                    "  GET /api/runs · GET /api/stream (SSE) · POST /api/runs · see docs/API.md"
+                )
+            );
+            forgeline_server::serve(
+                engine,
+                forgeline_server::ServerOptions {
+                    addr,
+                    token,
+                    allowed_origins: allow_origins,
+                    ui_dir: ui,
+                    resume_unfinished: resume,
+                },
+            )
+            .await?;
+            Ok(())
+        }
     }
 }
 
