@@ -1,0 +1,24 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Local state created by forgeline at runtime
+/.forgeline/state/
+/.forgeline/worktrees/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# UI
+node_modules/
+/ui/dist/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

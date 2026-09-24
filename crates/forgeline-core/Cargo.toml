@@ -1,0 +1,17 @@
+[package]
+name = "forgeline-core"
+description = "Domain model, event types and pure scheduling logic for Forgeline."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true
