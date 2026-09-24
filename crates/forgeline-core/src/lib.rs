@@ -5,9 +5,15 @@
 //! through these types.
 
 pub mod budget;
+pub mod events;
 pub mod graph;
 pub mod ids;
+pub mod model;
+pub mod state;
 
 pub use budget::{Budget, BudgetExceeded, Usage};
+pub use events::{AgentEvent, Event, EventKind, LogLevel};
 pub use graph::{DepGraph, GraphError};
 pub use ids::{ApprovalId, AttemptId, ParseIdError, RunId, TaskId, WorkspaceId};
+pub use model::*;
+pub use state::{ApplyError, ApprovalState, AttemptState, RunState, TaskState};
