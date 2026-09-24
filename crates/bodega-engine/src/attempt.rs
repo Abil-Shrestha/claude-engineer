@@ -36,6 +36,10 @@ pub(crate) struct AttemptContext {
     pub checks: Vec<Check>,
     pub policy: PermissionPolicy,
     pub limits: Limits,
+    /// This attempt's share of the run's remaining spend, enforced by the
+    /// agent itself where the runtime supports it (Claude Code does), so a
+    /// single long turn cannot overshoot the run's budget.
+    pub max_budget_usd: Option<f64>,
     pub feedback: Option<String>,
     /// The run's budget, and what the rest of the run had spent when this
     /// attempt started.
@@ -126,7 +130,7 @@ async fn execute(ctx: &AttemptContext, usage: &mut Usage) -> AttemptOutcome {
         disallowed_tools: ctx.agent.disallowed_tools.clone(),
         env: Default::default(),
         max_turns: ctx.agent.max_turns,
-        max_budget_usd: None,
+        max_budget_usd: ctx.max_budget_usd,
     };
     let mut session = match ctx.runtime.start(request).await {
         Ok(session) => session,

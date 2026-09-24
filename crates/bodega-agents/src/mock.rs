@@ -29,6 +29,8 @@ pub struct MockCall {
     pub input: String,
     pub workdir: PathBuf,
     pub session_id: String,
+    /// The spend cap the session was started with.
+    pub max_budget_usd: Option<f64>,
 }
 
 /// What the mock agent does on one turn.
@@ -190,6 +192,7 @@ async fn run_session(
             input: text,
             workdir: request.workdir.clone(),
             session_id: session_id.clone(),
+            max_budget_usd: request.max_budget_usd,
         };
         let turn = behavior(&call);
         if !run_turn(&call, turn, &mut total, &events, &pending).await {

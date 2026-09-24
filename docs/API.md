@@ -43,7 +43,7 @@ they drift, so the UI can rely on them.
 | `POST /api/runs` | `201 { run_id }`: starts a run (body: `CreateRun`) |
 | `GET /api/runs/{run_id}` | `RunState`: everything about one run |
 | `GET /api/runs/{run_id}/events?after=0&limit=500` | `Event[]`: the run's history, paged by `seq` |
-| `POST /api/runs/{run_id}/resume` | `202`: continue an unfinished run |
+| `POST /api/runs/{run_id}/resume` | `202`: continue an unfinished run (`409` if it is already running or finished) |
 | `GET /api/approvals` | `PendingApproval[]` across all runs |
 | `POST /api/approvals/{approval_id}` | `204`: resolve (body: `Resolve`) |
 | `GET /api/stream?after=&run=` | Server-sent events: every event after `seq`, then live |
@@ -147,7 +147,7 @@ Every event has `seq`, `run_id`, `at_ms` (Unix milliseconds) and a `type`:
 
 | `type` | Meaning | Key fields |
 |---|---|---|
-| `run_created` | A run was requested | `spec` (title, request, base_ref, budget) |
+| `run_created` | A run was requested | `spec` (title, request, base_ref, budget, and `config`: the configuration snapshot the run is verified by for its whole life) |
 | `run_status_changed` | Run lifecycle | `status`: `pending`, `running`, `waiting_for_approval`, `succeeded`, `failed`, `cancelled`; `stage`; `reason` |
 | `plan_proposed` | The plan | `summary`, `tasks` |
 | `task_created` | A task exists | `task_id`, `spec` (key, title, description, role, depends_on, acceptance) |

@@ -60,7 +60,14 @@ base_ref: string,
 /**
  * Name of the pipeline (stages and gates) this run follows.
  */
-pipeline: string, budget: Budget, };
+pipeline: string, budget: Budget, 
+/**
+ * The effective configuration (agents, checks, permissions, limits)
+ * captured when the run was created. Resuming uses this snapshot, so the
+ * rules a run is verified by never change mid-run, whatever branch is
+ * checked out later.
+ */
+config: JsonValue | null, };
 
 export type WorkSource = { "kind": "manual" } | { "kind": "github_issue", repo: string, number: number, } | { "kind": "linear", key: string, } | { "kind": "file", path: string, };
 

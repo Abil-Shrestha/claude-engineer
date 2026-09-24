@@ -8,7 +8,7 @@ use bodega_agents::{MockAgent, MockTurn};
 use bodega_config::Config;
 use bodega_core::{Event, EventKind, RunId, RunState, RunStatus, TaskStatus};
 use bodega_engine::Engine;
-use bodega_server::{Created, PendingApproval, ServerOptions, router};
+use bodega_server::{Created, PendingApproval, Server, ServerOptions, router};
 use bodega_store::{EventStore, RunSummary};
 use bodega_workspace::{GitRepo, Worktree};
 use futures_util::StreamExt;
@@ -390,4 +390,90 @@ async fn a_token_protects_every_endpoint() {
         .await
         .unwrap();
     assert_eq!(stream.status(), 200);
+}
+
+#[tokio::test]
+async fn startup_resume_and_the_api_share_one_guard() {
+    // A run that exists but is not being driven (as after a restart).
+    let dir = tempfile::tempdir().unwrap();
+    let repo_dir = dir.path().join("repo");
+    std::fs::create_dir(&repo_dir).unwrap();
+    let status = tokio::process::Command::new("git")
+        .args(["init", "--quiet", "--initial-branch=main"])
+        .current_dir(&repo_dir)
+        .status()
+        .await
+        .unwrap();
+    assert!(status.success());
+    std::fs::write(repo_dir.join("README.md"), "# guard\n").unwrap();
+    Worktree {
+        path: repo_dir.clone(),
+        branch: "main".into(),
+    }
+    .commit_all("initial")
+    .await
+    .unwrap();
+    let repo = GitRepo::open(&repo_dir).await.unwrap();
+    let config = Config::parse("[agents.default]\nruntime = \"mock\"\n").unwrap();
+    let store = EventStore::open(dir.path().join("db.sqlite")).unwrap();
+    let slow = MockAgent::new(|_| {
+        let mut turn = MockTurn::writes([("slow.txt", "done")]);
+        turn.delay = Duration::from_secs(3);
+        turn
+    });
+    let engine =
+        Engine::new(store, repo, config, dir.path().join("state")).with_runtime(Arc::new(slow));
+    let run_id = engine
+        .create_run(bodega_engine::NewRun {
+            title: "Resumed at startup".into(),
+            request: "x".into(),
+            source: bodega_core::WorkSource::Manual,
+            base_ref: Some("main".into()),
+            plan: bodega_config::Plan::single("x", "x"),
+            max_cost_usd: None,
+            max_tokens: None,
+        })
+        .await
+        .unwrap();
+
+    let options = ServerOptions {
+        addr: SocketAddr::from(([127, 0, 0, 1], 0)),
+        token: None,
+        allowed_origins: Vec::new(),
+        ui_dir: None,
+        resume_unfinished: true,
+    };
+    let server = Server::new(engine, options.clone());
+    assert_eq!(server.resume_unfinished().await.unwrap(), 1);
+    let listener = tokio::net::TcpListener::bind(options.addr).await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let app = server.router();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = reqwest::Client::new();
+
+    // The startup drive is still running, so the API must not start another.
+    let again = client
+        .post(format!("{base}/api/runs/{run_id}/resume"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(again.status(), 409, "{}", again.text().await.unwrap());
+
+    // And the run still finishes normally, with exactly one attempt.
+    let state = loop {
+        let state: RunState = client
+            .get(format!("{base}/api/runs/{run_id}"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        if state.status.is_terminal() {
+            break state;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(state.status, RunStatus::Succeeded);
+    assert_eq!(state.attempts.len(), 1);
 }

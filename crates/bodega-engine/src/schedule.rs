@@ -13,6 +13,64 @@ pub fn tasks_to_start(state: &RunState, running: usize, max_parallel: usize) -> 
     state.ready_tasks().into_iter().take(free).collect()
 }
 
+/// Smallest spend cap worth starting an attempt with.
+pub const MIN_ATTEMPT_BUDGET_USD: f64 = 0.05;
+
+/// How the run's remaining budget is split among attempts about to start.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BudgetShare {
+    /// The run has no cost limit.
+    Unlimited,
+    /// Start `count` attempts, each capped at `cap` dollars.
+    Each { cap: f64, count: usize },
+    /// Not enough budget left to start anything.
+    Exhausted,
+}
+
+/// Splits what is left of `max_cost` — after finished attempts' spend and
+/// the caps already handed to running attempts — evenly among `starting`
+/// attempts. Caps plus finished spend never exceed the budget, so parallel
+/// agents cannot jointly overshoot it; if the remainder is too small for
+/// all of them, fewer start.
+pub fn budget_share(
+    max_cost: Option<f64>,
+    finished_spend: f64,
+    reserved: f64,
+    starting: usize,
+) -> BudgetShare {
+    let Some(max_cost) = max_cost else {
+        return BudgetShare::Unlimited;
+    };
+    if starting == 0 {
+        return BudgetShare::Unlimited;
+    }
+    let available = max_cost - finished_spend - reserved;
+    let affordable = (available / MIN_ATTEMPT_BUDGET_USD).floor();
+    let count = if affordable >= 1.0 {
+        starting.min(affordable as usize)
+    } else {
+        0
+    };
+    if count == 0 {
+        BudgetShare::Exhausted
+    } else {
+        BudgetShare::Each {
+            cap: available / count as f64,
+            count,
+        }
+    }
+}
+
+/// Dollars spent by attempts that have finished.
+pub fn finished_spend(state: &RunState) -> f64 {
+    state
+        .attempts
+        .values()
+        .filter(|a| a.is_finished())
+        .map(|a| a.usage.cost_usd)
+        .sum()
+}
+
 /// Events to append after a task's latest attempt failed (or its verified
 /// work could not be integrated). Retries while attempts remain; otherwise
 /// fails the task and skips everything downstream of it.
@@ -165,6 +223,7 @@ mod tests {
                             base_ref: "main".into(),
                             pipeline: "default".into(),
                             budget: Default::default(),
+                            config: None,
                         },
                     },
                 })
@@ -306,6 +365,37 @@ mod tests {
                 ..
             }]
         ));
+    }
+
+    #[test]
+    fn budget_is_shared_without_overcommitting() {
+        assert_eq!(budget_share(None, 5.0, 0.0, 3), BudgetShare::Unlimited);
+        assert_eq!(
+            budget_share(Some(10.0), 0.0, 0.0, 0),
+            BudgetShare::Unlimited
+        );
+        assert_eq!(
+            budget_share(Some(10.0), 0.0, 0.0, 4),
+            BudgetShare::Each { cap: 2.5, count: 4 }
+        );
+        // Finished spend and running attempts' caps are both taken off.
+        assert_eq!(
+            budget_share(Some(10.0), 2.0, 5.0, 2),
+            BudgetShare::Each { cap: 1.5, count: 2 }
+        );
+        // Too little for everyone: fewer attempts start, each with a usable cap.
+        assert_eq!(
+            budget_share(Some(1.0), 0.875, 0.0, 5),
+            BudgetShare::Each {
+                cap: 0.0625,
+                count: 2
+            }
+        );
+        assert_eq!(
+            budget_share(Some(1.0), 0.99, 0.0, 1),
+            BudgetShare::Exhausted
+        );
+        assert_eq!(budget_share(Some(1.0), 0.5, 0.6, 1), BudgetShare::Exhausted);
     }
 
     #[test]

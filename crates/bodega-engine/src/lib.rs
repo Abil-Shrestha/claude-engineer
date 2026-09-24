@@ -78,6 +78,10 @@ pub struct Engine {
     config: Arc<Config>,
     runtimes: BTreeMap<String, Arc<dyn AgentRuntime>>,
     state_dir: PathBuf,
+    /// Runtime/model forced onto every role, including runs being resumed
+    /// (`--agent`, `--model`).
+    agent_override: Option<String>,
+    model_override: Option<String>,
 }
 
 impl Engine {
@@ -89,7 +93,18 @@ impl Engine {
             config: Arc::new(config),
             runtimes: BTreeMap::new(),
             state_dir,
+            agent_override: None,
+            model_override: None,
         }
+    }
+
+    /// Forces every role onto `runtime` and/or `model`, for new runs and for
+    /// runs this engine resumes. Everything else a run was created with
+    /// (checks, permissions, limits) stays as recorded in the run.
+    pub fn override_agents(mut self, runtime: Option<String>, model: Option<String>) -> Self {
+        self.agent_override = runtime;
+        self.model_override = model;
+        self
     }
 
     /// Registers an agent runtime under its name.
@@ -111,8 +126,9 @@ impl Engine {
     /// [`drive`]: Engine::drive
     pub async fn create_run(&self, new: NewRun) -> Result<RunId> {
         new.plan.validate()?;
+        let config = self.with_overrides((*self.config).clone());
         for task in &new.plan.tasks {
-            self.runtime_for(&task.role)?;
+            self.runtime_for(&config, &task.role)?;
         }
         let base_ref = match new
             .base_ref
@@ -128,7 +144,7 @@ impl Engine {
         // Fail early on a base that does not exist.
         self.repo.rev_parse(&base_ref).await?;
 
-        let limits = &self.config.limits;
+        let limits = &config.limits;
         let spec = RunSpec {
             title: new.title,
             request: new.request,
@@ -141,6 +157,7 @@ impl Engine {
                 max_wall_clock_secs: None,
                 max_attempts_per_task: limits.max_attempts_per_task,
             },
+            config: Some(serde_json::to_value(&config).expect("config always serializes")),
         };
         let run_id = RunId::new();
         let tasks = new.plan.task_specs();
@@ -181,9 +198,13 @@ impl Engine {
             .await?;
         }
 
-        let max_parallel = self.config.limits.max_parallel_agents.max(1);
+        let config = self.run_config(&state);
+        let max_parallel = config.limits.max_parallel_agents.max(1);
         let mut running: JoinSet<AttemptReport> = JoinSet::new();
         let mut in_flight: HashMap<tokio::task::Id, (TaskId, AttemptId)> = HashMap::new();
+        // Spend caps handed to running attempts, so parallel attempts can
+        // never jointly exceed the run's budget.
+        let mut reserved: HashMap<AttemptId, f64> = HashMap::new();
         loop {
             let state = self.load(run_id).await?;
             if let Some(exceeded) = state.spec.budget.check(&state.total_usage(), 0) {
@@ -198,8 +219,44 @@ impl Engine {
                     .await;
             }
 
-            for task_id in schedule::tasks_to_start(&state, running.len(), max_parallel) {
-                let ctx = self.prepare_attempt(&state, task_id, &integration).await?;
+            let mut starting = schedule::tasks_to_start(&state, running.len(), max_parallel);
+            let share = schedule::budget_share(
+                state.spec.budget.max_cost_usd,
+                schedule::finished_spend(&state),
+                reserved.values().sum(),
+                starting.len(),
+            );
+            let cap = match share {
+                schedule::BudgetShare::Unlimited => None,
+                schedule::BudgetShare::Each { cap, count } => {
+                    starting.truncate(count);
+                    Some(cap)
+                }
+                schedule::BudgetShare::Exhausted => {
+                    if running.is_empty() {
+                        return self
+                            .finish(
+                                &state,
+                                RunStatus::Failed,
+                                Some(
+                                    "budget exhausted: not enough left to start another attempt"
+                                        .into(),
+                                ),
+                                Vec::new(),
+                            )
+                            .await;
+                    }
+                    starting.clear();
+                    None
+                }
+            };
+            for task_id in starting {
+                let ctx = self
+                    .prepare_attempt(&config, &state, task_id, &integration, cap)
+                    .await?;
+                if let Some(cap) = cap {
+                    reserved.insert(ctx.attempt_id, cap);
+                }
                 let ids = (task_id, ctx.attempt_id);
                 let handle = running.spawn(attempt::run(ctx));
                 in_flight.insert(handle.id(), ids);
@@ -214,6 +271,7 @@ impl Engine {
             let report = match joined {
                 Ok((id, report)) => {
                     in_flight.remove(&id);
+                    reserved.remove(&report.attempt_id);
                     report
                 }
                 Err(join_error) => {
@@ -221,6 +279,7 @@ impl Engine {
                     let (task_id, attempt_id) = in_flight
                         .remove(&join_error.id())
                         .expect("every spawned attempt is tracked");
+                    reserved.remove(&attempt_id);
                     let outcome = AttemptOutcome::Failed {
                         kind: FailureKind::Infrastructure,
                         message: format!("the attempt crashed: {join_error}"),
@@ -244,7 +303,8 @@ impl Engine {
                     }
                 }
             };
-            self.handle_report(run_id, &integration, report).await?;
+            self.handle_report(&config, run_id, &integration, report)
+                .await?;
         }
     }
 
@@ -291,8 +351,30 @@ impl Engine {
         Ok(())
     }
 
-    fn runtime_for(&self, role: &str) -> Result<Arc<dyn AgentRuntime>> {
-        let name = self.config.agent_for(role).runtime;
+    /// `config` with this engine's `--agent`/`--model` overrides applied.
+    fn with_overrides(&self, mut config: Config) -> Config {
+        config.override_agents(
+            self.agent_override.as_deref(),
+            self.model_override.as_deref(),
+        );
+        config
+    }
+
+    /// The configuration a run was created with (falling back to this
+    /// engine's for runs recorded before snapshots existed), plus overrides.
+    fn run_config(&self, state: &RunState) -> Arc<Config> {
+        let recorded = state.spec.config.as_ref().and_then(|value| {
+            serde_json::from_value::<Config>(value.clone())
+                .inspect_err(|e| {
+                    tracing::warn!(run = %state.id, "ignoring unreadable config snapshot: {e}");
+                })
+                .ok()
+        });
+        Arc::new(self.with_overrides(recorded.unwrap_or_else(|| (*self.config).clone())))
+    }
+
+    fn runtime_for(&self, config: &Config, role: &str) -> Result<Arc<dyn AgentRuntime>> {
+        let name = config.agent_for(role).runtime;
         self.runtimes.get(&name).cloned().ok_or_else(|| {
             EngineError::UnknownRuntime(
                 name,
@@ -369,13 +451,15 @@ impl Engine {
     /// everything it needs to run.
     async fn prepare_attempt(
         &self,
+        config: &Config,
         state: &RunState,
         task_id: TaskId,
         integration: &Worktree,
+        max_budget_usd: Option<f64>,
     ) -> Result<AttemptContext> {
         let task = &state.tasks[&task_id];
-        let runtime = self.runtime_for(&task.spec.role)?;
-        let agent = self.config.agent_for(&task.spec.role);
+        let runtime = self.runtime_for(config, &task.spec.role)?;
+        let agent = config.agent_for(&task.spec.role);
         let number = task.attempts.len() as u32 + 1;
         let attempt_id = AttemptId::new();
         let branch = format!("bodega/{}/{}-{}", short_id(state.id), task.spec.key, number);
@@ -419,9 +503,10 @@ impl Engine {
             base_sha,
             runtime,
             agent,
-            checks: self.config.checks.clone(),
-            policy: self.config.permissions.clone(),
-            limits: self.config.limits.clone(),
+            checks: config.checks.clone(),
+            policy: config.permissions.clone(),
+            limits: config.limits.clone(),
+            max_budget_usd,
             feedback,
             budget: state.spec.budget.clone(),
             spent_before: state.total_usage(),
@@ -432,6 +517,7 @@ impl Engine {
     /// decides what happens after a failed one.
     async fn handle_report(
         &self,
+        config: &Config,
         run_id: RunId,
         integration: &Worktree,
         report: AttemptReport,
@@ -440,7 +526,7 @@ impl Engine {
         let max_attempts = state.spec.budget.max_attempts_per_task;
         let (reason, retryable) = match &report.outcome {
             AttemptOutcome::Succeeded { .. } => {
-                match self.integrate(run_id, integration, &report).await? {
+                match self.integrate(config, run_id, integration, &report).await? {
                     None => return Ok(()),
                     Some(reason) => (reason, true),
                 }
@@ -460,6 +546,7 @@ impl Engine {
     /// checks there. Returns `Some(reason)` if the work could not land.
     async fn integrate(
         &self,
+        config: &Config,
         run_id: RunId,
         integration: &Worktree,
         report: &AttemptReport,
@@ -472,8 +559,8 @@ impl Engine {
             .await
         {
             Ok(merge_commit) => {
-                let checks = &self.config.checks;
-                let results = if self.config.limits.verify_after_merge {
+                let checks = &config.checks;
+                let results = if config.limits.verify_after_merge {
                     checks::run_checks(&integration.path, checks, "integration:").await
                 } else {
                     Vec::new()

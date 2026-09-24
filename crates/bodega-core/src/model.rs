@@ -40,6 +40,12 @@ pub struct RunSpec {
     pub pipeline: String,
     #[serde(default)]
     pub budget: Budget,
+    /// The effective configuration (agents, checks, permissions, limits)
+    /// captured when the run was created. Resuming uses this snapshot, so the
+    /// rules a run is verified by never change mid-run, whatever branch is
+    /// checked out later.
+    #[serde(default)]
+    pub config: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]

@@ -166,11 +166,12 @@ async fn dispatch(cli: Cli) -> Result<()> {
         } => {
             let project = Project::open(&start, base.as_deref()).await?;
             let mut config = project.config.clone();
-            override_agents(&mut config, agent.as_deref(), model.as_deref());
             if let Some(parallel) = parallel {
                 config.limits.max_parallel_agents = parallel;
             }
-            let engine = project.engine(config)?;
+            // The run records this configuration (with the overrides), so
+            // resuming it later uses exactly the same rules.
+            let engine = project.engine(config)?.override_agents(agent, model);
             let (title, body) = match &request_file {
                 Some(path) => (
                     request.clone(),
@@ -211,9 +212,12 @@ async fn dispatch(cli: Cli) -> Result<()> {
         } => {
             let project = Project::open(&start, None).await?;
             let run_id = project.resolve_run(&run).await?;
-            let mut config = project.config.clone();
-            override_agents(&mut config, agent.as_deref(), None);
-            let engine = project.engine(config)?;
+            // The engine drives the run under the configuration it recorded
+            // when it was created, not whatever branch is checked out now;
+            // only an explicit --agent is applied on top.
+            let engine = project
+                .engine(project.config.clone())?
+                .override_agents(agent, None);
             follow_drive(&engine, run_id, verbose).await
         }
         Command::Runs => {
@@ -308,9 +312,9 @@ async fn dispatch(cli: Cli) -> Result<()> {
                 );
             }
             let project = Project::open(&start, None).await?;
-            let mut config = project.config.clone();
-            override_agents(&mut config, agent.as_deref(), None);
-            let engine = project.engine(config)?;
+            let engine = project
+                .engine(project.config.clone())?
+                .override_agents(agent, None);
             outln!(
                 "{} http://{addr}  {}",
                 ui::bold("bodega serve"),
@@ -441,25 +445,6 @@ async fn load_config(repo: &GitRepo, base: Option<&str>) -> Result<Config> {
         return Config::parse(&text).with_context(|| format!("in {}", local.display()));
     }
     Ok(Config::default())
-}
-
-fn override_agents(config: &mut Config, runtime: Option<&str>, model: Option<&str>) {
-    if runtime.is_none() && model.is_none() {
-        return;
-    }
-    if config.agents.is_empty() {
-        config
-            .agents
-            .insert("default".into(), AgentConfig::default());
-    }
-    for agent in config.agents.values_mut() {
-        if let Some(runtime) = runtime {
-            agent.runtime = runtime.to_owned();
-        }
-        if let Some(model) = model {
-            agent.model = Some(model.to_owned());
-        }
-    }
 }
 
 /// Drives a run while printing its events; Ctrl-C stops cleanly.

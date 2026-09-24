@@ -46,6 +46,7 @@ struct Harness {
     _dir: tempfile::TempDir,
     repo: GitRepo,
     engine: Engine,
+    state_dir: std::path::PathBuf,
 }
 
 impl Harness {
@@ -71,21 +72,27 @@ impl Harness {
         .unwrap();
         let repo = GitRepo::open(&repo_dir).await.unwrap();
         let store = EventStore::open(dir.path().join("bodega.sqlite")).unwrap();
+        let state_dir = dir.path().join("state");
         let engine = Engine::new(
             store,
             repo.clone(),
             Config::parse(config).unwrap(),
-            dir.path().join("state"),
+            state_dir.clone(),
         )
         .with_runtime(Arc::new(agent));
         Self {
             _dir: dir,
             repo,
             engine,
+            state_dir,
         }
     }
 
     async fn start(&self, plan: &str) -> RunId {
+        self.start_with_budget(plan, None).await
+    }
+
+    async fn start_with_budget(&self, plan: &str, max_cost_usd: Option<f64>) -> RunId {
         self.engine
             .create_run(NewRun {
                 title: "Test run".into(),
@@ -93,7 +100,7 @@ impl Harness {
                 source: WorkSource::Manual,
                 base_ref: Some("main".into()),
                 plan: Plan::parse(plan).unwrap(),
-                max_cost_usd: None,
+                max_cost_usd,
                 max_tokens: None,
             })
             .await
@@ -476,4 +483,87 @@ async fn rejects_plans_for_unknown_runtimes() {
         "{err}"
     );
     let _: &Path = h.repo.root();
+}
+
+#[tokio::test]
+async fn parallel_attempts_share_the_budget_without_overcommitting_it() {
+    /// (task key, spend cap) for every session the mock agent started.
+    type Caps = Arc<std::sync::Mutex<Vec<(String, Option<f64>)>>>;
+    let caps: Caps = Arc::default();
+    let seen = Arc::clone(&caps);
+    let agent = MockAgent::new(move |call| {
+        let key = task_key(&call.input).unwrap_or("?").to_owned();
+        seen.lock()
+            .unwrap()
+            .push((key.clone(), call.max_budget_usd));
+        let mut turn = MockTurn::writes([(format!("{key}.txt"), key)]);
+        turn.delay = Duration::from_millis(100);
+        turn
+    });
+    let h = Harness::new(CONFIG, agent).await;
+    let run_id = h
+        .start_with_budget(
+            r#"
+            [[tasks]]
+            key = "A"
+            title = "a"
+            [[tasks]]
+            key = "B"
+            title = "b"
+            [[tasks]]
+            key = "C"
+            title = "c"
+            depends_on = ["A", "B"]
+            "#,
+            Some(1.0),
+        )
+        .await;
+    let state = h.engine.drive(run_id).await.unwrap();
+    assert_eq!(
+        state.status,
+        RunStatus::Succeeded,
+        "{:?}",
+        state.status_reason
+    );
+
+    let caps = caps.lock().unwrap().clone();
+    let cap = |key: &str| {
+        caps.iter()
+            .find(|(k, _)| k == key)
+            .and_then(|(_, cap)| *cap)
+            .unwrap_or_else(|| panic!("{key} was started without a spend cap: {caps:?}"))
+    };
+    // A and B ran together and split the whole budget; C got what was left
+    // after their actual spend ($0.01 each).
+    assert!((cap("A") - 0.5).abs() < 1e-9, "{caps:?}");
+    assert!((cap("B") - 0.5).abs() < 1e-9, "{caps:?}");
+    assert!((cap("C") - 0.98).abs() < 1e-9, "{caps:?}");
+}
+
+#[tokio::test]
+async fn a_run_keeps_the_config_it_was_created_with() {
+    // Created under a config whose check always fails...
+    let strict = CONFIG
+        .replace("max_attempts_per_task = 2", "max_attempts_per_task = 1")
+        .replace("command = \"sh check.sh\"", "command = \"false\"");
+    let agent = MockAgent::new(|_| MockTurn::writes([("x.txt", "x")]));
+    let h = Harness::new(&strict, agent.clone()).await;
+    let run_id = h.start("[[tasks]]\nkey = \"T1\"\ntitle = \"t\"\n").await;
+
+    // ...and resumed by an engine configured with no checks at all (as if
+    // another branch were checked out). The run's own rules still apply.
+    let lax = Config::parse("[agents.default]\nruntime = \"mock\"\n").unwrap();
+    assert!(lax.checks.is_empty());
+    let resumed = Engine::new(
+        h.engine.store().clone(),
+        h.repo.clone(),
+        lax,
+        h.state_dir.clone(),
+    )
+    .with_runtime(Arc::new(agent));
+    let state = resumed.drive(run_id).await.unwrap();
+    assert_eq!(state.status, RunStatus::Failed);
+    let attempt = state.attempts.values().next().unwrap();
+    assert_eq!(attempt.checks[0].command, "false");
+    assert!(!attempt.checks[0].passed);
 }

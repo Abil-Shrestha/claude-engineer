@@ -7,7 +7,7 @@
 //! | `POST /api/runs` | Start a run (`{title, request, plan?, base_ref?, max_cost_usd?}`) |
 //! | `GET /api/runs/{id}` | Full run state (tasks, attempts, checks, approvals, usage) |
 //! | `GET /api/runs/{id}/events?after=&limit=` | Paged event history |
-//! | `POST /api/runs/{id}/resume` | Continue an unfinished run |
+//! | `POST /api/runs/{id}/resume` | Continue an unfinished run (`409` if it is already running) |
 //! | `GET /api/approvals` | Decisions waiting for a human, across runs |
 //! | `POST /api/approvals/{id}` | Resolve one (`{decision: "approved"|"rejected", comment?, by?}`) |
 //! | `GET /api/stream?after=&run=` | Server-sent events: every event after `seq`, then live |
@@ -90,71 +90,101 @@ impl AppState {
     }
 }
 
-/// Builds the API router (useful for embedding and tests).
-pub fn router(engine: Engine, options: &ServerOptions) -> Router {
-    let state = AppState {
-        engine,
-        driving: Arc::default(),
-        token: options.token.as_deref().map(Arc::from),
-    };
-    let api = Router::new()
-        .route("/api/health", get(health))
-        .route("/api/runs", get(list_runs).post(create_run))
-        .route("/api/runs/{id}", get(get_run))
-        .route("/api/runs/{id}/events", get(run_events))
-        .route("/api/runs/{id}/resume", post(resume_run))
-        .route("/api/approvals", get(list_approvals))
-        .route("/api/approvals/{id}", post(resolve_approval))
-        .route("/api/stream", get(stream))
-        .layer(middleware::from_fn_with_state(state.clone(), require_token))
-        .with_state(state);
+/// A server: one shared state (including the guard that keeps a run from
+/// being driven twice at once) behind both the HTTP routes and the startup
+/// resume of unfinished runs.
+pub struct Server {
+    state: AppState,
+    options: ServerOptions,
+}
 
-    let mut app = api;
-    if !options.allowed_origins.is_empty() {
-        let origins: Vec<HeaderValue> = options
-            .allowed_origins
-            .iter()
-            .filter_map(|o| o.parse().ok())
-            .collect();
-        app = app.layer(
-            tower_http::cors::CorsLayer::new()
-                .allow_origin(origins)
-                .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]),
-        );
+impl Server {
+    pub fn new(engine: Engine, options: ServerOptions) -> Self {
+        Self {
+            state: AppState {
+                engine,
+                driving: Arc::default(),
+                token: options.token.as_deref().map(Arc::from),
+            },
+            options,
+        }
     }
-    if let Some(dir) = &options.ui_dir {
-        let index = dir.join("index.html");
-        app = app.fallback_service(
-            tower_http::services::ServeDir::new(dir)
-                .fallback(tower_http::services::ServeFile::new(index)),
-        );
+
+    /// The HTTP routes, sharing this server's state.
+    pub fn router(&self) -> Router {
+        let state = self.state.clone();
+        let api = Router::new()
+            .route("/api/health", get(health))
+            .route("/api/runs", get(list_runs).post(create_run))
+            .route("/api/runs/{id}", get(get_run))
+            .route("/api/runs/{id}/events", get(run_events))
+            .route("/api/runs/{id}/resume", post(resume_run))
+            .route("/api/approvals", get(list_approvals))
+            .route("/api/approvals/{id}", post(resolve_approval))
+            .route("/api/stream", get(stream))
+            .layer(middleware::from_fn_with_state(state.clone(), require_token))
+            .with_state(state);
+
+        let mut app = api;
+        if !self.options.allowed_origins.is_empty() {
+            let origins: Vec<HeaderValue> = self
+                .options
+                .allowed_origins
+                .iter()
+                .filter_map(|o| o.parse().ok())
+                .collect();
+            app = app.layer(
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(origins)
+                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+                    .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]),
+            );
+        }
+        if let Some(dir) = &self.options.ui_dir {
+            let index = dir.join("index.html");
+            app = app.fallback_service(
+                tower_http::services::ServeDir::new(dir)
+                    .fallback(tower_http::services::ServeFile::new(index)),
+            );
+        }
+        app
     }
-    app
+
+    /// Starts driving every unfinished run in the background. Returns how
+    /// many were started.
+    pub async fn resume_unfinished(&self) -> Result<usize, bodega_store::StoreError> {
+        let runs = self.state.store().list_runs().await?;
+        let mut started = 0;
+        for run in runs.iter().filter(|r| !r.status.is_terminal()) {
+            tracing::info!(run = %run.run_id, "resuming unfinished run");
+            if self.state.spawn_drive(run.run_id) {
+                started += 1;
+            }
+        }
+        Ok(started)
+    }
+
+    /// Serves until the process is stopped.
+    pub async fn serve(self) -> std::io::Result<()> {
+        if self.options.resume_unfinished {
+            self.resume_unfinished()
+                .await
+                .map_err(std::io::Error::other)?;
+        }
+        let listener = tokio::net::TcpListener::bind(self.options.addr).await?;
+        tracing::info!("listening on http://{}", listener.local_addr()?);
+        axum::serve(listener, self.router()).await
+    }
+}
+
+/// Builds the API router for `engine` (useful for embedding and tests).
+pub fn router(engine: Engine, options: &ServerOptions) -> Router {
+    Server::new(engine, options.clone()).router()
 }
 
 /// Serves the API until the process is stopped.
 pub async fn serve(engine: Engine, options: ServerOptions) -> std::io::Result<()> {
-    let app = router(engine.clone(), &options);
-    if options.resume_unfinished {
-        let runs = engine
-            .store()
-            .list_runs()
-            .await
-            .map_err(std::io::Error::other)?;
-        let state = AppState {
-            engine,
-            driving: Arc::default(),
-            token: None,
-        };
-        for run in runs.iter().filter(|r| !r.status.is_terminal()) {
-            tracing::info!(run = %run.run_id, "resuming unfinished run");
-            state.spawn_drive(run.run_id);
-        }
-    }
-    let listener = tokio::net::TcpListener::bind(options.addr).await?;
-    tracing::info!("listening on http://{}", listener.local_addr()?);
-    axum::serve(listener, app).await
+    Server::new(engine, options).serve().await
 }
 
 async fn require_token(State(state): State<AppState>, request: Request, next: Next) -> Response {
@@ -373,7 +403,12 @@ async fn resume_run(
             format!("run {run_id} already finished"),
         ));
     }
-    state.spawn_drive(run_id);
+    if !state.spawn_drive(run_id) {
+        return Err(ApiError(
+            StatusCode::CONFLICT,
+            format!("run {run_id} is already running"),
+        ));
+    }
     Ok(StatusCode::ACCEPTED)
 }
 

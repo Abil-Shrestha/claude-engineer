@@ -98,6 +98,7 @@ mod tests {
             base_ref: "main".into(),
             pipeline: "default".into(),
             budget: Default::default(),
+            config: None,
         };
         let task = TaskSpec {
             key: "T2".into(),

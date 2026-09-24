@@ -86,6 +86,24 @@ impl Config {
         })
     }
 
+    /// Forces every role — including the `default` fallback, which is added
+    /// if missing — onto `runtime` and/or `model`. Used by `--agent` and
+    /// `--model`, which mean "for everything in this run".
+    pub fn override_agents(&mut self, runtime: Option<&str>, model: Option<&str>) {
+        if runtime.is_none() && model.is_none() {
+            return;
+        }
+        self.agents.entry("default".into()).or_default();
+        for agent in self.agents.values_mut() {
+            if let Some(runtime) = runtime {
+                agent.runtime = runtime.to_owned();
+            }
+            if let Some(model) = model {
+                agent.model = Some(model.to_owned());
+            }
+        }
+    }
+
     /// The agent settings for `role`, falling back to `default`, then to
     /// built-in defaults.
     pub fn agent_for(&self, role: &str) -> AgentConfig {
@@ -449,6 +467,28 @@ mod tests {
             Some("claude-opus-5")
         );
         assert_eq!(config.checks[0].timeout_secs, 900);
+    }
+
+    #[test]
+    fn overrides_cover_roles_without_their_own_entry() {
+        // Only a role-specific entry exists: an implementer would fall back
+        // to the built-in default, so the override must cover that too.
+        let mut config = Config::parse(
+            "[agents.reviewer]\nruntime = \"claude-code\"\nmodel = \"claude-opus-5\"\n",
+        )
+        .unwrap();
+        config.override_agents(Some("mock"), None);
+        assert_eq!(config.agent_for("implementer").runtime, "mock");
+        assert_eq!(config.agent_for("reviewer").runtime, "mock");
+        assert_eq!(
+            config.agent_for("reviewer").model.as_deref(),
+            Some("claude-opus-5"),
+            "only the runtime was overridden"
+        );
+
+        let mut untouched = Config::default();
+        untouched.override_agents(None, None);
+        assert!(untouched.agents.is_empty());
     }
 
     #[test]
