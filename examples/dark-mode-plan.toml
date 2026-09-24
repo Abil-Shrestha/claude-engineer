@@ -1,0 +1,24 @@
+# An example plan: four tasks, two of which can run in parallel.
+#   bodega run "Add dark mode" --plan examples/dark-mode-plan.toml
+summary = "Dark mode: tokens, toggle, persistence, docs"
+
+[[tasks]]
+key = "tokens"
+title = "Add color tokens for light and dark themes"
+description = "Define the palette in one place. Do not change components yet."
+
+[[tasks]]
+key = "toggle"
+title = "Add a theme toggle to the header"
+acceptance = ["Clicking the toggle switches themes immediately"]
+
+[[tasks]]
+key = "persist"
+title = "Persist the chosen theme"
+depends_on = ["toggle"]
+acceptance = ["The choice survives a reload", "Without a saved choice, follow the OS setting"]
+
+[[tasks]]
+key = "docs"
+title = "Document theming for contributors"
+depends_on = ["tokens", "persist"]

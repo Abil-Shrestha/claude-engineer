@@ -1,0 +1,21 @@
+[package]
+name = "bodega-workspace"
+description = "Isolated workspaces for Bodega agents: git worktrees first, containers and remote sandboxes later."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bodega-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
