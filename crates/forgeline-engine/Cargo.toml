@@ -1,0 +1,29 @@
+[package]
+name = "forgeline-engine"
+description = "The Forgeline engine: turns plans into parallel, verified, integrated agent work."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+forgeline-agents.workspace = true
+forgeline-config.workspace = true
+forgeline-core.workspace = true
+forgeline-store.workspace = true
+forgeline-workspace.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[target."cfg(unix)".dependencies]
+nix = { version = "0.31.3", features = ["signal", "process"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

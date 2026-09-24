@@ -137,6 +137,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgeline-engine"
+version = "0.1.0"
+dependencies = [
+ "forgeline-agents",
+ "forgeline-config",
+ "forgeline-core",
+ "forgeline-store",
+ "forgeline-workspace",
+ "nix",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "forgeline-store"
 version = "0.1.0"
 dependencies = [

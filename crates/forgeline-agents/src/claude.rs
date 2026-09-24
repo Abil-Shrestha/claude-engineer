@@ -534,6 +534,22 @@ struct ClaudeControl {
     next_request: std::sync::atomic::AtomicU64,
 }
 
+impl Drop for ClaudeControl {
+    /// A session dropped without `shutdown` (an aborted attempt, a crashed
+    /// engine task) must not leave the agent running unsupervised.
+    fn drop(&mut self) {
+        if *self.exited.borrow() {
+            return;
+        }
+        #[cfg(unix)]
+        if let Some(pid) = self.pid {
+            use nix::sys::signal::{Signal, killpg};
+            use nix::unistd::Pid;
+            let _ = killpg(Pid::from_raw(pid as i32), Signal::SIGTERM);
+        }
+    }
+}
+
 #[async_trait]
 impl AgentControl for ClaudeControl {
     async fn send(&self, text: String) -> Result<()> {
